@@ -1,0 +1,866 @@
+[
+ {
+  "name": "Catch",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "catch-active"
+ },
+ {
+  "name": "Diving Catch",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "diving-catch-active"
+ },
+ {
+  "name": "Diving Tackle",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "diving-tackle-active"
+ },
+ {
+  "name": "Dodge",
+  "category": "A",
+  "elite": true,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "dodge-active"
+ },
+ {
+  "name": "Defensive",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "defensive-active"
+ },
+ {
+  "name": "Hit and Run",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "hit-and-run-active"
+ },
+ {
+  "name": "Jump Up",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "jump-up-active"
+ },
+ {
+  "name": "Leap",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "leap-active"
+ },
+ {
+  "name": "Safe Pair of Hands",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "safe-pair-of-hands-active"
+ },
+ {
+  "name": "Sidestep",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "sidestep-active"
+ },
+ {
+  "name": "Sprint",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "sprint-active"
+ },
+ {
+  "name": "Sure Feet",
+  "category": "A",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "sure-feet-active"
+ },
+ {
+  "name": "Dirty Player",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "dirty-player-active"
+ },
+ {
+  "name": "Eye Gouge",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "eye-gouge-active"
+ },
+ {
+  "name": "Fumblerooski",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "fumblerooski-active"
+ },
+ {
+  "name": "Lethal Flight",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "lethal-flight-active"
+ },
+ {
+  "name": "Lone Fouler",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "lone-fouler-active"
+ },
+ {
+  "name": "Pile Driver",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "pile-driver-active"
+ },
+ {
+  "name": "Put the Boot In",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "put-the-boot-in-active"
+ },
+ {
+  "name": "Quick Foul",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "quick-foul-active"
+ },
+ {
+  "name": "Saboteur",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "saboteur-active"
+ },
+ {
+  "name": "Shadowing",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "shadowing-active"
+ },
+ {
+  "name": "Sneaky Git",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "sneaky-git-active"
+ },
+ {
+  "name": "Violent Innovator",
+  "category": "D",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "violent-innovator-active"
+ },
+ {
+  "name": "Block",
+  "category": "G",
+  "elite": true,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "block-active"
+ },
+ {
+  "name": "Dauntless",
+  "category": "G",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "dauntless-active"
+ },
+ {
+  "name": "Fend",
+  "category": "G",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "fend-active"
+ },
+ {
+  "name": "Frenzy",
+  "category": "G",
+  "elite": false,
+  "mandatory": true,
+  "type": "active",
+  "anchor": "frenzy-active"
+ },
+ {
+  "name": "Kick",
+  "category": "G",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "kick-active"
+ },
+ {
+  "name": "Pro",
+  "category": "G",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "pro-active"
+ },
+ {
+  "name": "Steady Footing",
+  "category": "G",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "steady-footing-active"
+ },
+ {
+  "name": "Strip Ball",
+  "category": "G",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "strip-ball-active"
+ },
+ {
+  "name": "Sure Hands",
+  "category": "G",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "sure-hands-active"
+ },
+ {
+  "name": "Tackle",
+  "category": "G",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "tackle-active"
+ },
+ {
+  "name": "Taunt",
+  "category": "G",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "taunt-active"
+ },
+ {
+  "name": "Wrestle",
+  "category": "G",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "wrestle-active"
+ },
+ {
+  "name": "Big Hand",
+  "category": "M",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "big-hand-active"
+ },
+ {
+  "name": "Claws",
+  "category": "M",
+  "elite": false,
+  "mandatory": false,
+  "type": "passive",
+  "anchor": "claws-passive"
+ },
+ {
+  "name": "Disturbing Presence",
+  "category": "M",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "disturbing-presence-passive"
+ },
+ {
+  "name": "Extra Arms",
+  "category": "M",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "extra-arms-active"
+ },
+ {
+  "name": "Foul Appearance",
+  "category": "M",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "foul-appearance-passive"
+ },
+ {
+  "name": "Horns",
+  "category": "M",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "horns-active"
+ },
+ {
+  "name": "Iron Hard Skin",
+  "category": "M",
+  "elite": false,
+  "mandatory": false,
+  "type": "passive",
+  "anchor": "iron-hard-skin-passive"
+ },
+ {
+  "name": "Monstrous Mouth",
+  "category": "M",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "monstrous-mouth-active"
+ },
+ {
+  "name": "Prehensile Tail",
+  "category": "M",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "prehensile-tail-active"
+ },
+ {
+  "name": "Tentacles",
+  "category": "M",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "tentacles-active"
+ },
+ {
+  "name": "Two Heads",
+  "category": "M",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "two-heads-active"
+ },
+ {
+  "name": "Very Long Legs",
+  "category": "M",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "very-long-legs-active"
+ },
+ {
+  "name": "Accurate",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "accurate-active"
+ },
+ {
+  "name": "Cannoneer",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "cannoneer-active"
+ },
+ {
+  "name": "Cloud Burster",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "cloud-burster-active"
+ },
+ {
+  "name": "Dump-off",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "dump-off-active"
+ },
+ {
+  "name": "Give and Go",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "give-and-go-active"
+ },
+ {
+  "name": "Hail Mary Pass",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "hail-mary-pass-active"
+ },
+ {
+  "name": "Leader",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "passive",
+  "anchor": "leader-passive"
+ },
+ {
+  "name": "Nerves of Steel",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "nerves-of-steel-active"
+ },
+ {
+  "name": "On the Ball",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "on-the-ball-active"
+ },
+ {
+  "name": "Pass",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "pass-active"
+ },
+ {
+  "name": "Punt",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "punt-active"
+ },
+ {
+  "name": "Safe Pass",
+  "category": "P",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "safe-pass-active"
+ },
+ {
+  "name": "Arm Bar",
+  "category": "S",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "arm-bar-active"
+ },
+ {
+  "name": "Brawler",
+  "category": "S",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "brawler-active"
+ },
+ {
+  "name": "Break Tackle",
+  "category": "S",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "break-tackle-active"
+ },
+ {
+  "name": "Bullseye",
+  "category": "S",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "bullseye-active"
+ },
+ {
+  "name": "Grab",
+  "category": "S",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "grab-active"
+ },
+ {
+  "name": "Guard",
+  "category": "S",
+  "elite": true,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "guard-active"
+ },
+ {
+  "name": "Juggernaut",
+  "category": "S",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "juggernaut-active"
+ },
+ {
+  "name": "Mighty Blow",
+  "category": "S",
+  "elite": true,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "mighty-blow-active"
+ },
+ {
+  "name": "Multiple Block",
+  "category": "S",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "multiple-block-active"
+ },
+ {
+  "name": "Stand Firm",
+  "category": "S",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "stand-firm-active"
+ },
+ {
+  "name": "Strong Arm",
+  "category": "S",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "strong-arm-active"
+ },
+ {
+  "name": "Thick Skull",
+  "category": "S",
+  "elite": false,
+  "mandatory": false,
+  "type": "passive",
+  "anchor": "thick-skull-passive"
+ },
+ {
+  "name": "Always Hungry",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "active",
+  "anchor": "always-hungry-active"
+ },
+ {
+  "name": "Animal Savagery",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "animal-savagery-passive"
+ },
+ {
+  "name": "Animosity (X)",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "active",
+  "anchor": "animosity-x-active"
+ },
+ {
+  "name": "Ball & Chain",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "active",
+  "anchor": "ball-chain-active"
+ },
+ {
+  "name": "Bloodlust (X+)",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "bloodlust-x-passive"
+ },
+ {
+  "name": "Bombardier",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "bombardier-active"
+ },
+ {
+  "name": "Bone Head",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "bone-head-passive"
+ },
+ {
+  "name": "Breathe Fire",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "breathe-fire-active"
+ },
+ {
+  "name": "Chainsaw",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "active",
+  "anchor": "chainsaw-active"
+ },
+ {
+  "name": "Decay",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "decay-passive"
+ },
+ {
+  "name": "Drunkard",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "drunkard-passive"
+ },
+ {
+  "name": "Hatred (X)",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "hatred-x-passive"
+ },
+ {
+  "name": "Hypnotic Gaze",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "hypnotic-gaze-active"
+ },
+ {
+  "name": "Insignificant",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "insignificant-passive"
+ },
+ {
+  "name": "Kick Team-mate",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "passive",
+  "anchor": "kick-team-mate-passive"
+ },
+ {
+  "name": "Loner (X+)",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "loner-x-passive"
+ },
+ {
+  "name": "My Ball",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "my-ball-passive"
+ },
+ {
+  "name": "No Ball",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "no-ball-passive"
+ },
+ {
+  "name": "Pick-me-up",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "pick-me-up-active"
+ },
+ {
+  "name": "Plague Ridden",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "passive",
+  "anchor": "plague-ridden-passive"
+ },
+ {
+  "name": "Pogo",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "pogo-active"
+ },
+ {
+  "name": "Projectile Vomit",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "projectile-vomit-active"
+ },
+ {
+  "name": "Really Stupid",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "really-stupid-passive"
+ },
+ {
+  "name": "Regeneration",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "passive",
+  "anchor": "regeneration-passive"
+ },
+ {
+  "name": "Right Stuff",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "right-stuff-passive"
+ },
+ {
+  "name": "Secret Weapon",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "secret-weapon-passive"
+ },
+ {
+  "name": "Stab",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "stab-active"
+ },
+ {
+  "name": "Stunty",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "stunty-passive"
+ },
+ {
+  "name": "Swoop",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "swoop-active"
+ },
+ {
+  "name": "Take Root",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "take-root-passive"
+ },
+ {
+  "name": "Throw Team-mate",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "throw-team-mate-active"
+ },
+ {
+  "name": "Timmm-ber!",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "passive",
+  "anchor": "timmm-ber-passive"
+ },
+ {
+  "name": "Titchy",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "titchy-passive"
+ },
+ {
+  "name": "Trickster",
+  "category": "T",
+  "elite": false,
+  "mandatory": false,
+  "type": "active",
+  "anchor": "trickster-active"
+ },
+ {
+  "name": "Unchannelled Fury",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "unchannelled-fury-passive"
+ },
+ {
+  "name": "Unsteady",
+  "category": "T",
+  "elite": false,
+  "mandatory": true,
+  "type": "passive",
+  "anchor": "unsteady-passive"
+ }
+]
