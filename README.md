@@ -1,4 +1,4 @@
-# Sevens Dugout
+# Blood Bowl Buben
 
 Blood Bowl Sevens companion: team manager, live match tracker and stats. (Async online play is parked: [docs/PART2-ONLINE-PLAY.md](docs/PART2-ONLINE-PLAY.md).)
 See [ROADMAP.md](ROADMAP.md) and [DECISIONS.md](DECISIONS.md).

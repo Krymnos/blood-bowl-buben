@@ -11,8 +11,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Sevens Dugout — Blood Bowl Sevens manager',
-        short_name: 'Sevens Dugout',
+        name: 'Blood Bowl Buben — Sevens team manager',
+        short_name: 'BB Buben',
         theme_color: '#14532d',
         background_color: '#0b1210',
         display: 'standalone',

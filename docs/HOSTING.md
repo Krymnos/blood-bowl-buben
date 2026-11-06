@@ -3,22 +3,22 @@
 ## Overview
 | What | Where | Visibility |
 |---|---|---|
-| App code | GitHub repository, e.g. `sevens-dugout` | **public** (needed for free GitHub Pages) |
-| The app itself | GitHub Pages: `https://<user>.github.io/sevens-dugout/` | public URL, but it only shows the data stored on the device opening it |
+| App code | GitHub repository, e.g. `blood-bowl-buben` | **public** (needed for free GitHub Pages) |
+| The app itself | GitHub Pages: `https://<user>.github.io/blood-bowl-buben/` | public URL, but it only shows the data stored on the device opening it |
 | Your data (live) | the phone's browser storage (IndexedDB) | this device only |
-| Your data (backup) | second GitHub repository, e.g. `sevens-dugout-data` | **private** |
+| Your data (backup) | second GitHub repository, e.g. `blood-bowl-buben-data` | **private** |
 | Backup token | the phone's browser storage (localStorage), entered in Settings | this device only; never in the code or the backup file |
 
 No own server, no database server, nothing to patch. Cost: free.
 
 ## One-time setup
 1. **GitHub account:** use a personal one (not work), with 2FA or a passkey.
-2. **App repository (public):** create `sevens-dugout` and push this folder to it.
+2. **App repository (public):** create `blood-bowl-buben` and push this folder to it.
    Settings → Pages → Source: **GitHub Actions**. Every push to `main` builds and publishes the app (`.github/workflows/deploy.yml`).
-3. **Data repository (private):** create `sevens-dugout-data`, empty.
+3. **Data repository (private):** create `blood-bowl-buben-data`, empty.
 4. **Token:** GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token:
    - Expiration: 1 year (the app says when it has expired; then create a new one)
-   - Repository access: **Only select repositories** → `sevens-dugout-data`
+   - Repository access: **Only select repositories** → `blood-bowl-buben-data`
    - Permissions → Repository permissions → **Contents: Read and write** (Metadata: read-only is added automatically). Nothing else.
 5. **Phone:** open the Pages URL → Share → **Add to Home Screen** (on iPhone this also stops Safari from deleting the data after 7 days without use).
    In the app: Settings → Cloud backup → user name, data repository, token → **Connect & test**.

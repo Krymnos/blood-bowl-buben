@@ -171,6 +171,7 @@ export interface SettingsRow {
   value: LeagueSettings
 }
 
+// Internal DB name kept from the app's old name so existing data stays visible.
 export const db = new Dexie('sevens-dugout') as Dexie & {
   teams: EntityTable<Team, 'id'>
   players: EntityTable<Player, 'id'>

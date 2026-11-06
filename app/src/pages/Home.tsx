@@ -22,7 +22,7 @@ export default function Home() {
   if (!data) return null
   const open = data.matches.filter((m) => m.status !== 'done')
   return (
-    <Page title="Sevens Dugout" sub="Blood Bowl Sevens · Team manager" right={<LinkButton to="/team/new" className="!px-3 !py-1.5">+ Team</LinkButton>}>
+    <Page title="Blood Bowl Buben" sub="Sevens league · Team manager" right={<LinkButton to="/team/new" className="!px-3 !py-1.5">+ Team</LinkButton>}>
       {open.length > 0 && (
         <>
           <H2>Games in progress</H2>

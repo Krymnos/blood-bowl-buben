@@ -24,7 +24,7 @@ export interface CloudStatus {
 
 const CFG_KEY = 'sd-cloud-config'
 const ST_KEY = 'sd-cloud-status'
-export const DEFAULT_PATH = 'sevens-dugout-backup.json'
+export const DEFAULT_PATH = 'blood-bowl-buben-backup.json'
 const AUTO_DELAY = 60_000
 
 const load = <T>(k: string): T | undefined => {

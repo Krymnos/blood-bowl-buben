@@ -10,7 +10,7 @@ const blobToDataUrl = (b: Blob) =>
 export async function buildBackup() {
   const photos = await db.photos.toArray()
   return {
-    app: 'sevens-dugout',
+    app: 'blood-bowl-buben',
     version: 1,
     exportedAt: new Date().toISOString(),
     teams: await db.teams.toArray(),
@@ -27,14 +27,14 @@ export async function exportAll() {
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `sevens-dugout-${new Date().toISOString().slice(0, 10)}.json`
+  a.download = `blood-bowl-buben-${new Date().toISOString().slice(0, 10)}.json`
   a.click()
   setTimeout(() => URL.revokeObjectURL(a.href), 2000)
 }
 
 export async function importAll(text: string) {
   const data = JSON.parse(text)
-  if (data.app !== 'sevens-dugout') throw new Error('Not a Sevens Dugout backup')
+  if (data.app !== 'blood-bowl-buben' && data.app !== 'sevens-dugout') throw new Error('Not a Blood Bowl Buben backup')
   const photos = await Promise.all((data.photos ?? []).map(async (p: { blob: string }) => ({ ...p, blob: await (await fetch(p.blob)).blob() })))
   await db.transaction('rw', [db.teams, db.players, db.matches, db.events, db.settings, db.photos], async () => {
     await Promise.all([db.teams.clear(), db.players.clear(), db.matches.clear(), db.events.clear(), db.settings.clear(), db.photos.clear()])

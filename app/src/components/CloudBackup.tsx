@@ -51,7 +51,7 @@ export default function CloudBackup() {
         <details className="rounded-xl bg-white/5 p-2 text-xs leading-relaxed text-white/60">
           <summary className="cursor-pointer font-semibold text-white/80">How to get a token</summary>
           <ol className="ml-4 mt-1 list-decimal space-y-1">
-            <li>On GitHub, create a <b>private</b> repository, e.g. <code>sevens-dugout-data</code>.</li>
+            <li>On GitHub, create a <b>private</b> repository, e.g. <code>blood-bowl-buben-data</code>.</li>
             <li>
               Open{' '}
               <a className="text-turf underline" href={TOKEN_URL} target="_blank" rel="noreferrer">
@@ -65,7 +65,7 @@ export default function CloudBackup() {
           </ol>
         </details>
         <input className={inputCls} placeholder="GitHub user name" autoCapitalize="none" autoCorrect="off" value={form.owner} onChange={f('owner')} />
-        <input className={inputCls} placeholder="Data repository, e.g. sevens-dugout-data" autoCapitalize="none" autoCorrect="off" value={form.repo} onChange={f('repo')} />
+        <input className={inputCls} placeholder="Data repository, e.g. blood-bowl-buben-data" autoCapitalize="none" autoCorrect="off" value={form.repo} onChange={f('repo')} />
         <input className={inputCls} placeholder="Token (github_pat_…)" type="password" autoComplete="off" value={form.token} onChange={f('token')} />
         <Button
           className="w-full"
