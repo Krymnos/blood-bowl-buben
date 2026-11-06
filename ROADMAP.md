@@ -31,7 +31,7 @@ Only Sevens. No other formats.
 - Data model: League → Team → Player → Match → Event
 
 ### Phase 1: Roster builder & team sheet ← **prototype**
-- Create a team by draft: 600k budget, 7–11 players, max 4 non-Linemen, QTY limits, pick 1 Veteran (MA −1, once-per-game re-roll)
+- Create a team by draft: 600k budget, 7–11 players, max 4 non-Linemen, QTY limits
 - Buy re-rolls (100k each), assistant coaches/cheerleaders (20k, max 3), apothecary (80k), and dedicated fans (start 1, +20k each, 1–5)
 - Live counters for Team Value / Current Team Value, treasury, budget left, and rule warnings
 - Player cards: stats, skills (base + gained), value with skill increases, injuries (MNG / Dead), number, name

@@ -25,7 +25,7 @@ export function statDelta(p: Player, s: Stat) {
 export function profile(p: Player, rosterId: string): Profile {
   const pos = getPositional(rosterId, p.position)
   const dl = (s: Stat) => statDelta(p, s)
-  const ma = (pos?.ma ?? 0) + dl('ma').imp - dl('ma').inj - (p.veteran ? 1 : 0)
+  const ma = (pos?.ma ?? 0) + dl('ma').imp - dl('ma').inj
   const st = (pos?.st ?? 0) + dl('st').imp - dl('st').inj
   const target = (base: number | null, s: Stat, lo: number, hi: number) => {
     const { imp, inj } = dl(s)
@@ -88,9 +88,6 @@ export function validateTeam(t: Team, players: Player[]): Warning[] {
     const n = active.filter((p) => p.position === pos.name).length
     if (n > pos.max) w.push({ level: 'error', text: `${n}× ${pos.name}; max ${pos.max}.` })
   }
-  const vets = active.filter((p) => p.veteran)
-  if (vets.length === 0 && active.some((p) => isLinemanName(t.rosterId, p.position))) w.push({ level: 'warn', text: 'No Veteran chosen (pick one Lineman).' })
-  if (vets.length > 1) w.push({ level: 'error', text: 'Only one Veteran allowed.' })
   if (t.treasury < 0) w.push({ level: 'error', text: 'Treasury is negative (over budget).' })
   if (t.dedicatedFans < SEVENS.minFans) w.push({ level: 'warn', text: `Dedicated Fans should be at least ${SEVENS.minFans}.` })
   if (t.assistantCoaches > SEVENS.maxAssistantCoaches) w.push({ level: 'error', text: `Max ${SEVENS.maxAssistantCoaches} Assistant Coaches.` })

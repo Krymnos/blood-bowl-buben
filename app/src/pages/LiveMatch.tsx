@@ -9,8 +9,8 @@ import { recalcScore } from '../logic/actions'
 import { d } from '../logic/dice'
 import { Button, Field, inputCls, Sheet, Toggle } from '../components/ui'
 
-const US_MAIN: EventType[] = ['td', 'completion', 'cas', 'interception', 'ko', 'block']
-const US_MORE: EventType[] = ['catch', 'deflection', 'knockdown', 'armour', 'foul', 'sentoff', 'ttm_throw', 'ttm_land', 'fail_dodge', 'fail_rush', 'fail_pickup', 'fail_catch', 'fail_pass', 'nuffle']
+const US_MAIN: EventType[] = ['td', 'completion', 'cas', 'interception', 'ko', 'ttm_throw', 'ttm_land']
+const US_MORE: EventType[] = ['block', 'catch', 'deflection', 'knockdown', 'armour', 'foul', 'sentoff', 'fail_dodge', 'fail_rush', 'fail_pickup', 'fail_catch', 'fail_pass', 'nuffle']
 const THEM_MAIN: EventType[] = ['td', 'cas', 'ko', 'interception', 'completion', 'foul']
 const THEM_MORE: EventType[] = ['sentoff', 'armour', 'knockdown', 'nuffle', 'reroll']
 export const THEM_LABEL: Partial<Record<EventType, string>> = {
@@ -92,11 +92,9 @@ export default function LiveMatch({ match: m, edit = false }: { match: Match; ed
   const induced = m.inducements.find((i) => i.id === 'reroll')?.qty ?? 0
   const base = team.rerolls + induced
   const thisHalf = events.filter((e) => e.half === m.half && e.side === 'us')
-  const used = thisHalf.filter((e) => e.type === 'reroll' && e.label !== 'veteran').length
+  const used = thisHalf.filter((e) => e.type === 'reroll').length
   const gained = thisHalf.filter((e) => e.type === 'reroll_gain').length
   const left = base + gained - used
-  const veteran = players.find((p) => p.veteran)
-  const vetUsed = events.some((e) => e.type === 'reroll' && e.label === 'veteran')
 
   const mainButtons = side === 'us' ? US_MAIN : THEM_MAIN
   const moreButtons = side === 'us' ? US_MORE : THEM_MORE
@@ -155,16 +153,6 @@ export default function LiveMatch({ match: m, edit = false }: { match: Match; ed
               ➕
             </Button>
           </div>
-          {veteran && (
-            <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-2 text-sm">
-              <span>
-                Veteran re-roll <span className="text-xs text-white/50">· {veteran.name}, once per game</span>
-              </span>
-              <Button variant={vetUsed ? 'ghost' : 'soft'} className="!py-1.5" disabled={vetUsed} onClick={() => add({ type: 'reroll', side: 'us', label: 'veteran', playerId: veteran.id })}>
-                {vetUsed ? 'used' : 'Use'}
-              </Button>
-            </div>
-          )}
           {induced > 0 && <div className="mt-1 text-[11px] text-white/40">incl. {induced} induced re-roll{induced > 1 ? 's' : ''}. ➕ = free re-roll (e.g. Brilliant Coaching, lost at end of drive).</div>}
         </div>
 
@@ -551,7 +539,7 @@ export function describe(e: MatchEvent, pName: (id?: number) => string) {
   if (e.type === 'kickoff') return <>🦶 Kick-off: <b>{e.label}</b></>
   if (e.type === 'weather') return <>🌦️ Weather: <b>{e.label}</b></>
   if (e.type === 'note') return <>📝 {e.text}</>
-  if (e.type === 'reroll' && e.side === 'us') return <>🔄 {e.label === 'veteran' ? <>Veteran re-roll{e.playerId && <b> · {pName(e.playerId)}</b>}</> : 'Team re-roll used'}</>
+  if (e.type === 'reroll' && e.side === 'us') return <>🔄 Team re-roll used</>
   if (e.type === 'reroll_gain') return <>➕ Bonus re-roll{e.label ? ` (${e.label})` : ''}</>
   const base = e.side === 'us' ? EVENT_LABEL[e.type] : THEM_LABEL[e.type] ?? EVENT_LABEL[e.type]
   const who = e.side === 'us' ? pName(e.playerId) : pName(e.victimId)

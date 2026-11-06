@@ -5,9 +5,9 @@ import { db, uid, type Advancement, type Player, type PlayerStatus, type Team } 
 import { CATEGORY_NAMES, findSkill, getPositional, getRoster, skillsInCategory, skillUrl } from '../rules/data'
 import { CAS_NAMES, charImprovementFor, LEVEL_NAMES, SEVENS, STAT_LABEL, type LeagueSettings } from '../rules/sevens'
 import type { SkillCategory, Stat } from '../rules/types'
-import { fmtTarget, isLinemanName, playerValue, profile, statDelta } from '../logic/team'
+import { fmtTarget, playerValue, profile, statDelta } from '../logic/team'
 import { computeStats } from '../logic/stats'
-import { isDraft, removePlayer, setVeteran } from '../logic/actions'
+import { isDraft, removePlayer } from '../logic/actions'
 import { d } from '../logic/dice'
 import { EVENT_LABEL } from '../logic/events'
 import { fmtDate, gp } from '../logic/format'
@@ -59,7 +59,6 @@ export default function PlayerPage() {
           {pr.gainedSkills.map((s) => <SkillChip key={s} name={s} gained />)}
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {p.veteran && <Badge tone="blue">Veteran (−1 MA, once/game re-roll)</Badge>}
           {p.journeyman && <Badge>Journeyman (Loner 5+)</Badge>}
           {p.missNextGame && <Badge tone="red">Misses next game</Badge>}
           {p.status !== 'active' && <Badge tone="red">{p.status}</Badge>}
@@ -502,7 +501,6 @@ function EditPlayerSheet({ onClose, p, team, draft }: { onClose: () => void; p: 
         <Button className="w-full" onClick={save}>
           Save
         </Button>
-        {isLinemanName(team.rosterId, p.position) && <Toggle label="Veteran (one Lineman per team)" checked={p.veteran} onChange={(v) => setVeteran(team, p, v)} />}
         <Toggle label="Misses next game" checked={p.missNextGame} onChange={(v) => db.players.update(p.id, { missNextGame: v })} />
         <Toggle label="Journeyman (Loner 5+)" checked={!!p.journeyman} onChange={(v) => db.players.update(p.id, { journeyman: v })} />
         <H2>Injuries</H2>

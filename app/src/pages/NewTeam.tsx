@@ -92,7 +92,7 @@ export default function NewTeam() {
         </Card>
       )}
       <Card className="text-xs text-white/60">
-        League draft: {gp(SEVENS.draftBudget)} budget · 7–11 players · max 4 non-Linemen · 1 Veteran Lineman (−1 MA, once-per-game re-roll) · Re-rolls {gp(SEVENS.rerollCost)} · Assistant Coaches {gp(SEVENS.assistantCoachCost)} (0-3) · Cheerleaders {gp(SEVENS.cheerleaderCost)} (0-6) · Apothecary {gp(SEVENS.apothecaryCost)} · Goblin lawyer {gp(SEVENS.lawyerCost)} · 1 free Dedicated Fan · Leader forbidden. Left-over budget is lost after the draft.
+        League draft: {gp(SEVENS.draftBudget)} budget · 7–11 players · max 4 non-Linemen · Re-rolls {gp(SEVENS.rerollCost)} · Assistant Coaches {gp(SEVENS.assistantCoachCost)} (0-3) · Cheerleaders {gp(SEVENS.cheerleaderCost)} (0-6) · Apothecary {gp(SEVENS.apothecaryCost)} · Goblin lawyer {gp(SEVENS.lawyerCost)} · 1 free Dedicated Fan · Leader forbidden. Left-over budget is lost after the draft.
       </Card>
       <Button className="w-full !py-3.5 text-base" onClick={create}>
         Start drafting →

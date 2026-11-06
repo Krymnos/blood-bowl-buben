@@ -176,7 +176,6 @@ export function PlayerRow({ p, team, spp, canAdvance, onClick }: { p: Player; te
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1">
             <span className="font-semibold">{p.name}</span>
-            {p.veteran && <Badge tone="blue">Veteran</Badge>}
             {p.journeyman && <Badge>Journeyman</Badge>}
             {p.missNextGame && <Badge tone="red">MNG</Badge>}
             {p.injuries.some((i) => i.kind === 'niggling') && <Badge tone="red">Niggle ×{p.injuries.filter((i) => i.kind === 'niggling').length}</Badge>}

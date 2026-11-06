@@ -24,7 +24,7 @@ export async function seedDemo(): Promise<number> {
 
     const mk = (number: number, name: string, position: string, extra: Partial<Player> = {}) =>
       ({
-        teamId, number, name, position, veteran: false, advancements: [], injuries: [], extraSkills: [], missNextGame: false,
+        teamId, number, name, position, advancements: [], injuries: [], extraSkills: [], missNextGame: false,
         status: 'active', sppAdjust: 0, valueAdjust: 0, hiredAt: now - 21 * DAY, ...extra,
       }) as unknown as Player
     const ids = (await db.players.bulkAdd(
@@ -33,7 +33,7 @@ export async function seedDemo(): Promise<number> {
         mk(2, 'Rusty', 'Woodland Fox'),
         mk(3, 'Fizzwick Sparkwhistle', 'Gnome Illusionist'),
         mk(4, 'Bramwell Copperbolt', 'Gnome Beastmaster'),
-        mk(5, 'Tobble Mossnose', 'Gnome Lineman', { veteran: true }),
+        mk(5, 'Tobble Mossnose', 'Gnome Lineman'),
         mk(6, 'Pip Thistletwist', 'Gnome Lineman'),
         mk(7, 'Zook Gearspanner', 'Gnome Lineman', {
           advancements: [{ id: uid(), kind: 'primary', skill: 'Sidestep', random: true, spp: 3, value: 10_000, scoutRoll: 4, at: now - 6 * DAY }],
@@ -96,7 +96,7 @@ export async function seedDemo(): Promise<number> {
       ev(m2, 1, 1, 'us', 'kickoff', { label: 'Changing Weather' }),
       ev(m2, 1, 1, 'us', 'weather', { label: 'Pouring Rain' }),
       ev(m2, 1, 2, 'us', 'fail_dodge', { playerId: P(3) }),
-      ev(m2, 1, 2, 'us', 'reroll', { label: 'veteran', playerId: P(5) }),
+      ev(m2, 1, 2, 'us', 'reroll', { label: 'team' }),
       ev(m2, 1, 3, 'them', 'td'),
       ev(m2, 1, 4, 'us', 'ttm_throw', { playerId: P(1) }),
       ev(m2, 1, 4, 'us', 'ttm_land', { playerId: P(7) }),

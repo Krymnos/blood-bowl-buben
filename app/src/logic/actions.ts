@@ -13,7 +13,7 @@ export async function finishDraft(team: Team) {
 
 const newPlayer = (teamId: number, number: number, name: string, position: string, extra: Partial<Player> = {}) =>
   ({
-    teamId, number, name, position, veteran: false, advancements: [], injuries: [], extraSkills: [], missNextGame: false,
+    teamId, number, name, position, advancements: [], injuries: [], extraSkills: [], missNextGame: false,
     status: 'active', sppAdjust: 0, valueAdjust: 0, hiredAt: Date.now(), ...extra,
   }) as unknown as Player
 
@@ -38,13 +38,6 @@ export async function removePlayer(team: Team, p: Player, draft: boolean) {
   } else {
     await db.players.update(p.id, { status: 'fired' })
   }
-}
-
-export async function setVeteran(team: Team, p: Player, on: boolean) {
-  await db.transaction('rw', db.players, async () => {
-    if (on) await db.players.where('teamId').equals(team.id).modify({ veteran: false })
-    await db.players.update(p.id, { veteran: on })
-  })
 }
 
 type StaffKey = 'rerolls' | 'assistantCoaches' | 'cheerleaders' | 'apothecary' | 'lawyer'

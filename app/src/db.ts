@@ -55,7 +55,6 @@ export interface Player {
   number: number
   name: string
   position: string
-  veteran: boolean
   advancements: Advancement[]
   injuries: Injury[]
   /** skills added by hand (e.g. Hatred from Getting Even) — no value change */
