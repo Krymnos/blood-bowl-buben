@@ -12,4 +12,4 @@ npm run build      # static PWA in app/dist, host anywhere
 
 Hosting (GitHub Pages) and cloud backup (private GitHub repository): see [docs/HOSTING.md](docs/HOSTING.md).
 
-Rules data (`app/src/data/*.json`) was generated from bloodbowlbase.ru (Third Season + Spike! 22 errata). Unofficial fan tool, not affiliated with Games Workshop.
+Rules data (`app/src/data/*.json`) was generated from bloodbowlbase.ru (Third Season + Spike! 22 errata). Rosters were checked against the league's source of truth, the Sevens rosters on bbroster.com (2026-11-06): Sevens tiers, leagues, skill categories and the NAF Slann roster come from there. Unofficial fan tool, not affiliated with Games Workshop.

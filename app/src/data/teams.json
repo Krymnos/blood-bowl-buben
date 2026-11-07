@@ -513,7 +513,8 @@
   "name": "Chaos Dwarf",
   "tier": 1,
   "leagues": [
-   "Badlands Brawl"
+   "Badlands Brawl",
+   "Chaos Clash"
   ],
   "specialRules": [
    "Favoured of Hashut"
@@ -1317,7 +1318,7 @@
  {
   "id": "elven_union",
   "name": "Elven Union",
-  "tier": 2,
+  "tier": 1,
   "leagues": [
    "Elven Kingdoms League"
   ],
@@ -1438,7 +1439,8 @@
   "name": "Gnome",
   "tier": 4,
   "leagues": [
-   "Halfling Thimble Cup"
+   "Halfling Thimble Cup",
+   "Woodland League"
   ],
   "specialRules": [],
   "rerollCost": 50000,
@@ -1595,7 +1597,8 @@
   "name": "Goblin",
   "tier": 4,
   "leagues": [
-   "Badlands Brawl"
+   "Badlands Brawl",
+   "Underworld Challenge"
   ],
   "specialRules": [
    "Bribery and Corruption"
@@ -1844,9 +1847,10 @@
  {
   "id": "halfling",
   "name": "Halfling",
-  "tier": 4,
+  "tier": 3,
   "leagues": [
-   "Halfling Thimble Cup"
+   "Halfling Thimble Cup",
+   "Woodland League"
   ],
   "specialRules": [],
   "rerollCost": 60000,
@@ -1967,8 +1971,7 @@
     "secondary": [
      "A",
      "G",
-     "P",
-     "D"
+     "P"
     ],
     "cost": 120000
    }
@@ -2096,7 +2099,7 @@
  {
   "id": "human",
   "name": "Human",
-  "tier": 2,
+  "tier": 1,
   "leagues": [
    "Old World Classic"
   ],
@@ -2555,7 +2558,7 @@
  {
   "id": "lizardmen",
   "name": "Lizardmen",
-  "tier": 1,
+  "tier": 2,
   "leagues": [
    "Lustrian Superleague"
   ],
@@ -2681,7 +2684,7 @@
  {
   "id": "necromantic_horror",
   "name": "Necromantic Horror",
-  "tier": 2,
+  "tier": 1,
   "leagues": [
    "Sylvanian Spotlight"
   ],
@@ -2848,6 +2851,7 @@
   "name": "Norse",
   "tier": 1,
   "leagues": [
+   "Chaos Clash",
    "Old World Classic"
   ],
   "specialRules": [
@@ -3029,7 +3033,7 @@
  {
   "id": "nurgle",
   "name": "Nurgle",
-  "tier": 3,
+  "tier": 2,
   "leagues": [
    "Chaos Clash"
   ],
@@ -3173,7 +3177,8 @@
   "name": "Ogre",
   "tier": 4,
   "leagues": [
-   "Badlands Brawl"
+   "Badlands Brawl",
+   "Worlds Edge Superleague"
   ],
   "specialRules": [
    "Brawlin' Brutes",
@@ -3942,7 +3947,7 @@
  {
   "id": "skaven",
   "name": "Skaven",
-  "tier": 2,
+  "tier": 1,
   "leagues": [
    "Underworld Challenge"
   ],
@@ -4089,6 +4094,131 @@
      "M"
     ],
     "cost": 150000
+   }
+  ]
+ },
+ {
+  "id": "slann",
+  "name": "Slann",
+  "tier": 2,
+  "leagues": [
+   "Lustrian Superleague"
+  ],
+  "specialRules": [],
+  "rerollCost": 50000,
+  "apothecary": true,
+  "positionals": [
+   {
+    "name": "Slann Lineman",
+    "keywords": [
+     "Lineman",
+     "Slann"
+    ],
+    "min": 0,
+    "max": 16,
+    "ma": 6,
+    "st": 3,
+    "ag": "3+",
+    "pa": "4+",
+    "av": "9+",
+    "skills": [
+     "Pogo"
+    ],
+    "primary": [
+     "G"
+    ],
+    "secondary": [
+     "A",
+     "S"
+    ],
+    "cost": 60000
+   },
+   {
+    "name": "Slann Catcher",
+    "keywords": [
+     "Catcher",
+     "Slann"
+    ],
+    "min": 0,
+    "max": 2,
+    "ma": 7,
+    "st": 2,
+    "ag": "2+",
+    "pa": "3+",
+    "av": "8+",
+    "skills": [
+     "Diving Catch",
+     "On the Ball",
+     "Pogo",
+     "Very Long Legs"
+    ],
+    "primary": [
+     "A",
+     "G"
+    ],
+    "secondary": [
+     "P",
+     "S"
+    ],
+    "cost": 80000
+   },
+   {
+    "name": "Slann Blitzer",
+    "keywords": [
+     "Blitzer",
+     "Slann"
+    ],
+    "min": 0,
+    "max": 2,
+    "ma": 7,
+    "st": 3,
+    "ag": "3+",
+    "pa": "4+",
+    "av": "9+",
+    "skills": [
+     "Diving Tackle",
+     "Hit and Run",
+     "Jump Up",
+     "Pogo"
+    ],
+    "primary": [
+     "A",
+     "G",
+     "S"
+    ],
+    "secondary": [
+     "P"
+    ],
+    "cost": 100000
+   },
+   {
+    "name": "Kroxigor",
+    "keywords": [
+     "Big Guy",
+     "Lizardman"
+    ],
+    "min": 0,
+    "max": 1,
+    "ma": 6,
+    "st": 5,
+    "ag": "5+",
+    "pa": "6+",
+    "av": "10+",
+    "skills": [
+     "Bone Head",
+     "Loner (4+)",
+     "Mighty Blow",
+     "Prehensile Tail",
+     "Thick Skull"
+    ],
+    "primary": [
+     "S"
+    ],
+    "secondary": [
+     "A",
+     "G"
+    ],
+    "cost": 140000
    }
   ]
  },
@@ -4429,7 +4559,7 @@
  {
   "id": "underworld_denizens",
   "name": "Underworld Denizens",
-  "tier": 1,
+  "tier": 3,
   "leagues": [
    "Underworld Challenge"
   ],
@@ -4611,7 +4741,7 @@
     ],
     "secondary": [
      "A",
-     "P"
+     "D"
     ],
     "cost": 90000
    },
@@ -4841,7 +4971,8 @@
   "name": "Wood Elf",
   "tier": 1,
   "leagues": [
-   "Elven Kingdoms League"
+   "Elven Kingdoms League",
+   "Woodland League"
   ],
   "specialRules": [],
   "rerollCost": 50000,
@@ -4980,7 +5111,8 @@
     ],
     "secondary": [
      "A",
-     "G"
+     "G",
+     "P"
     ],
     "cost": 120000
    }
