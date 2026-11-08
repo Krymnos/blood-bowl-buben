@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate, useParams } from 'react-router-dom'
 import { db, type Player, type Team } from '../db'
 import { getRoster, isLineman } from '../rules/data'
-import { SEVENS } from '../rules/sevens'
+import { SEVENS, STAT_LABEL } from '../rules/sevens'
 import { fmtTarget, hireable, playerValue, profile, teamValue, validateTeam } from '../logic/team'
 import { cheapestAdvance, computeStats, resultOf, teamRecord } from '../logic/stats'
 import { changeStaff, finishDraft, hirePlayer, isDraft, startMatch } from '../logic/actions'
@@ -179,6 +179,9 @@ export function PlayerRow({ p, team, spp, canAdvance, onClick }: { p: Player; te
             {p.journeyman && <Badge>Journeyman</Badge>}
             {p.missNextGame && <Badge tone="red">MNG</Badge>}
             {p.injuries.some((i) => i.kind === 'niggling') && <Badge tone="red">Niggle ×{p.injuries.filter((i) => i.kind === 'niggling').length}</Badge>}
+            {p.injuries.filter((i) => i.kind === 'stat').map((i) => (
+              <Badge key={i.id} tone="red">−1 {STAT_LABEL[i.stat!]}</Badge>
+            ))}
             {canAdvance && <Badge tone="gold">★ Advance</Badge>}
           </div>
           <div className="text-xs text-white/50">{p.position}</div>

@@ -42,7 +42,7 @@ export default function Stats() {
   const done = matches.filter((m) => m.status === 'done').sort((a, b) => a.date - b.date)
   const rec = teamRecord(matches)
   const casFor = events.filter((e) => e.type === 'cas' && e.side === 'us').length
-  const casAgainst = events.filter((e) => e.type === 'cas' && e.side === 'them').length
+  const casAgainst = events.filter((e) => e.type === 'cas' && e.side === 'them' && e.cause !== 'self').length
   const deaths = players.filter((p) => p.status === 'dead')
 
   // streak

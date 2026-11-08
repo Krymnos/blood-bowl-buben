@@ -133,7 +133,8 @@ export type EventType =
   | 'catch' | 'reroll' | 'reroll_gain'
   | 'kickoff' | 'weather' | 'note'
 
-export type CasCause = 'block' | 'foul' | 'crowd' | 'other'
+/** 'self' = our player hurt by their own action (failed dodge, rush, …) */
+export type CasCause = 'block' | 'foul' | 'crowd' | 'other' | 'self'
 
 export interface MatchEvent {
   id: number

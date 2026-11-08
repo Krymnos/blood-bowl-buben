@@ -1,4 +1,4 @@
-import { db, getSettings, type Match, type Player, type Team } from '../db'
+import { db, getSettings, type Injury, type Match, type Player, type Team } from '../db'
 import { getPositional, getRoster, isLineman } from '../rules/data'
 import { SEVENS } from '../rules/sevens'
 import { nextNumber, teamValue } from './team'
@@ -150,3 +150,37 @@ export async function recalcScore(matchId: number) {
 }
 
 export const rosterName = (id: string) => getRoster(id)?.name ?? id
+
+/**
+ * Applies the casualties our players suffered in a finished match to the roster: injuries, MNG, death.
+ * Idempotent — injuries from this match are rebuilt from the log, so it runs again after the log of a
+ * finished match is edited. MNG is only touched while this is still the team's latest match.
+ */
+export async function syncMatchInjuries(matchId: number) {
+  const m = await db.matches.get(matchId)
+  if (!m || m.status !== 'done') return
+  const events = await db.events.where('matchId').equals(matchId).toArray()
+  const cas = events.filter((e) => e.side === 'them' && e.type === 'cas' && e.victimId != null)
+  const teamMatches = await db.matches.where('teamId').equals(m.teamId).toArray()
+  const latest = !teamMatches.some((x) => x.id > m.id)
+  const players = await db.players.where('teamId').equals(m.teamId).toArray()
+  for (const p of players) {
+    const mine = cas.filter((e) => e.victimId === p.id)
+    const fromMatch = p.injuries.some((i) => i.matchId === m.id) || p.diedInMatch === m.id
+    if (!mine.length && !fromMatch) continue
+    const injuries = [
+      ...p.injuries.filter((i) => i.matchId !== m.id),
+      ...mine.flatMap((e): Injury[] =>
+        e.result === 'si' ? [{ id: `${e.id}`, kind: 'niggling' as const, matchId: m.id, at: e.at }]
+        : e.result === 'li' ? [{ id: `${e.id}`, kind: 'stat' as const, stat: e.stat ?? 'av', matchId: m.id, at: e.at }]
+        : [],
+      ),
+    ]
+    const dead = mine.some((e) => e.result === 'dead')
+    const patch: Partial<Player> = { injuries }
+    if (dead) Object.assign(patch, { status: 'dead', diedInMatch: m.id })
+    else if (p.diedInMatch === m.id) Object.assign(patch, { status: p.journeyman ? 'released' : 'active', diedInMatch: undefined })
+    if (latest && !dead) patch.missNextGame = mine.some((e) => e.result === 'sh' || e.result === 'si' || e.result === 'li')
+    await db.players.update(p.id, patch)
+  }
+}

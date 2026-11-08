@@ -31,7 +31,7 @@ export default function MatchReport({ match: m }: { match: Match }) {
   const mvp = players.find((p) => p.id === m.mvpPlayerId)
   const halves = [1, 2].map((h) => events.filter((e) => e.half === h))
   const ourCas = events.filter((e) => e.type === 'cas' && e.side === 'us').length
-  const theirCas = events.filter((e) => e.type === 'cas' && e.side === 'them').length
+  const theirCas = events.filter((e) => e.type === 'cas' && e.side === 'them' && e.cause !== 'self').length
   const rerollsUsed = events.filter((e) => e.type === 'reroll' && e.side === 'us').length
 
   return (

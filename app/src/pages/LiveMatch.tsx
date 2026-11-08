@@ -5,7 +5,7 @@ import { db, type CasCause, type EventType, type Match, type MatchEvent, type Pl
 import { CASUALTY, casualtyFor, CAS_NAMES, KICKOFF, LASTING_INJURY, lastingInjuryFor, SEVENS, STAT_LABEL, weatherFor, WEATHER, type CasResult } from '../rules/sevens'
 import type { Stat } from '../rules/types'
 import { EVENT_LABEL } from '../logic/events'
-import { recalcScore } from '../logic/actions'
+import { recalcScore, syncMatchInjuries } from '../logic/actions'
 import { d } from '../logic/dice'
 import { Button, Field, inputCls, Sheet, Toggle } from '../components/ui'
 
@@ -19,12 +19,14 @@ export const THEM_LABEL: Partial<Record<EventType, string>> = {
 }
 /** "them" events that hit one of our players */
 const THEM_VICTIM: EventType[] = ['cas', 'ko', 'foul', 'armour', 'knockdown']
-const CAUSE_LABEL: Record<CasCause, string> = { block: '💥 Block', foul: '🥾 Foul', crowd: '👥 Crowd', other: '❓ Other' }
+const CAUSE_LABEL: Record<CasCause, string> = { block: '💥 Block', foul: '🥾 Foul', crowd: '👥 Crowd', other: '❓ Other', self: '🤸 Own action' }
+/** our own actions that can leave our player injured (asks what happened to them) */
+const SELF_INJURY: EventType[] = ['fail_dodge', 'fail_rush', 'nuffle']
 
 interface Flow {
   type: EventType
   side: 'us' | 'them'
-  step: 'player' | 'cause' | 'result' | 'stat'
+  step: 'player' | 'outcome' | 'cause' | 'result' | 'stat'
   playerId?: number
   victimId?: number
   cause?: CasCause
@@ -55,14 +57,19 @@ export default function LiveMatch({ match: m, edit = false }: { match: Match; ed
     return p ? `#${p.number} ${p.name}` : ''
   }
 
-  const add = async (e: Partial<MatchEvent>) => {
+  /** writes an event; `add` also closes the current flow */
+  const log = async (e: Partial<MatchEvent>) => {
     await db.events.add({ matchId: m.id, teamId: m.teamId, at: Date.now(), half: m.half, turn: m.turn, ...e } as MatchEvent)
     if (e.type === 'td') await recalcScore(m.id)
-    setFlow(null)
+    await syncMatchInjuries(m.id)
     const label = e.side === 'them' ? THEM_LABEL[e.type!] : EVENT_LABEL[e.type!]
     setFlash(`${label ?? e.type}${e.playerId ? ` · ${pName(e.playerId)}` : ''}${e.victimId ? ` · ${pName(e.victimId)}` : ''}`)
     setTimeout(() => setFlash(null), 1600)
     if (navigator.vibrate) navigator.vibrate(30)
+  }
+  const add = async (e: Partial<MatchEvent>) => {
+    setFlow(null)
+    await log(e)
   }
 
   const start = (type: EventType) => {
@@ -75,6 +82,7 @@ export default function LiveMatch({ match: m, edit = false }: { match: Match; ed
     if (!flow) return
     const f = flow.side === 'us' ? { ...flow, playerId: id } : { ...flow, victimId: id }
     if (flow.type === 'cas') setFlow({ ...f, step: 'cause' })
+    else if (flow.side === 'us' && id != null && SELF_INJURY.includes(flow.type)) setFlow({ ...f, step: 'outcome' })
     else add({ type: f.type, side: f.side, playerId: f.playerId, victimId: f.victimId })
   }
 
@@ -208,6 +216,7 @@ export default function LiveMatch({ match: m, edit = false }: { match: Match; ed
                 onClick={async () => {
                   await db.events.delete(e.id)
                   if (e.type === 'td') await recalcScore(m.id)
+                  await syncMatchInjuries(m.id)
                 }}
                 aria-label="Undo"
               >
@@ -218,7 +227,7 @@ export default function LiveMatch({ match: m, edit = false }: { match: Match; ed
         </div>
 
         {edit ? (
-          <Button className="w-full !py-4 text-base" onClick={() => nav(`/match/${m.id}`)}>
+          <Button className="w-full !py-4 text-base" onClick={async () => { await syncMatchInjuries(m.id); nav(`/match/${m.id}`) }}>
             ✅ Done editing
           </Button>
         ) : (
@@ -250,6 +259,37 @@ export default function LiveMatch({ match: m, edit = false }: { match: Match; ed
         </Button>
       </Sheet>
 
+      {/* Own action gone wrong: did our player get hurt? */}
+      <Sheet open={flow?.step === 'outcome'} onClose={() => setFlow(null)} title={flow ? `${EVENT_LABEL[flow.type]} · ${pName(flow.playerId)} — what happened?` : ''}>
+        <div className="space-y-2">
+          <Button variant="soft" className="w-full !py-4" onClick={() => add({ type: flow!.type, side: 'us', playerId: flow!.playerId })}>
+            ⬇️ Fell over / Stunned — no injury
+          </Button>
+          <Button
+            variant="soft"
+            className="w-full !py-4"
+            onClick={async () => {
+              const f = flow!
+              await log({ type: f.type, side: 'us', playerId: f.playerId })
+              await add({ type: 'ko', side: 'them', victimId: f.playerId, label: 'self' })
+            }}
+          >
+            💫 Knocked out
+          </Button>
+          <Button
+            variant="soft"
+            className="w-full !py-4"
+            onClick={async () => {
+              const f = flow!
+              setFlow({ type: 'cas', side: 'them', victimId: f.playerId, cause: 'self', step: 'result' })
+              await log({ type: f.type, side: 'us', playerId: f.playerId })
+            }}
+          >
+            🚑 Casualty → roll on the Casualty table
+          </Button>
+        </div>
+      </Sheet>
+
       {/* Casualty cause */}
       <Sheet open={flow?.step === 'cause'} onClose={() => setFlow(null)} title="How did it happen?">
         {flow?.side === 'us' && (
@@ -258,7 +298,7 @@ export default function LiveMatch({ match: m, edit = false }: { match: Match; ed
           </div>
         )}
         <div className="grid grid-cols-2 gap-2">
-          {(['block', 'foul', 'crowd', 'other'] as CasCause[]).map((c) => (
+          {((flow?.side === 'us' ? ['block', 'foul', 'crowd', 'other'] : ['block', 'foul', 'crowd', 'self', 'other']) as CasCause[]).map((c) => (
             <Button key={c} variant="soft" className="!py-4" onClick={() => setFlow({ ...flow!, cause: c, step: 'result' })}>
               {CAUSE_LABEL[c]}
             </Button>
@@ -413,11 +453,13 @@ function EventEditSheet({ e, players, onClose }: { e: MatchEvent; players: Playe
   const save = async () => {
     await db.events.put(x)
     await recalcScore(x.matchId)
+    await syncMatchInjuries(x.matchId)
     onClose()
   }
   const del = async () => {
     await db.events.delete(e.id)
     await recalcScore(e.matchId)
+    await syncMatchInjuries(e.matchId)
     onClose()
   }
   const playerSelect = (value: number | undefined, onChange: (v: number | undefined) => void) => (
@@ -543,11 +585,12 @@ export function describe(e: MatchEvent, pName: (id?: number) => string) {
   if (e.type === 'reroll_gain') return <>➕ Bonus re-roll{e.label ? ` (${e.label})` : ''}</>
   const base = e.side === 'us' ? EVENT_LABEL[e.type] : THEM_LABEL[e.type] ?? EVENT_LABEL[e.type]
   const who = e.side === 'us' ? pName(e.playerId) : pName(e.victimId)
-  const cas = e.type === 'cas' ? [e.star && '⭐ Star Player', e.cause, e.result && CAS_NAMES[e.result], e.stat && e.result === 'li' && `−1 ${STAT_LABEL[e.stat]}`].filter(Boolean).join(', ') : ''
+  const cas = e.type === 'cas' ? [e.star && '⭐ Star Player', e.cause === 'self' ? 'own action' : e.cause, e.result && CAS_NAMES[e.result], e.stat && e.result === 'li' && `−1 ${STAT_LABEL[e.stat]}`].filter(Boolean).join(', ') : ''
   return (
     <>
       {base}
       {e.label === 'concession' && ' (concession)'}
+      {e.type === 'ko' && e.label === 'self' && <span className="text-white/50"> (own action)</span>}
       {who && <b> · {who}</b>}
       {cas && <span className="text-white/50"> ({cas})</span>}
     </>

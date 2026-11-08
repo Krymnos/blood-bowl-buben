@@ -1,14 +1,15 @@
 import type { ReactNode } from 'react'
 import { backupSoon } from '../logic/cloud'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, uid, type Match, type Player } from '../db'
-import { CASUALTY, CAS_NAMES, EXPENSIVE_MISTAKES, MISTAKE_NAMES, mistakeBand, STAT_LABEL, type CasResult, type MistakeResult } from '../rules/sevens'
+import { db, type Match, type Player } from '../db'
+import type { Stat } from '../rules/types'
+import { CASUALTY, CAS_NAMES, EXPENSIVE_MISTAKES, LASTING_INJURY, MISTAKE_NAMES, mistakeBand, STAT_LABEL, type CasResult, type MistakeResult } from '../rules/sevens'
 import { computeStats } from '../logic/stats'
-import { journeymanPrice, recalcScore } from '../logic/actions'
+import { journeymanPrice, recalcScore, syncMatchInjuries } from '../logic/actions'
 import { teamValue } from '../logic/team'
 import { d } from '../logic/dice'
 import { gp } from '../logic/format'
-import { Badge, Button, Card, DiceInput, inputCls, LinkButton, NumberInput, Page, Toggle, useSettings, Step } from '../components/ui'
+import { Button, Card, DiceInput, inputCls, LinkButton, NumberInput, Page, Toggle, useSettings, Step } from '../components/ui'
 import { Photos } from './MatchReport'
 
 export default function PostGame({ match: m }: { match: Match }) {
@@ -84,16 +85,8 @@ export default function PostGame({ match: m }: { match: Match }) {
 
   const finish = async () => {
     if (!confirm('Finish the game and apply winnings, fans, injuries and journeymen to your team?')) return
-    await db.transaction('rw', db.players, db.teams, db.matches, async () => {
+    await db.transaction('rw', [db.players, db.teams, db.matches, db.events], async () => {
       for (const id of m.missing) await db.players.update(id, { missNextGame: false })
-      for (const e of ourCas) {
-        const p = await db.players.get(e.victimId!)
-        if (!p) continue
-        if (e.result === 'dead') await db.players.update(p.id, { status: 'dead', diedInMatch: m.id })
-        else if (e.result === 'sh') await db.players.update(p.id, { missNextGame: true })
-        else if (e.result === 'si') await db.players.update(p.id, { missNextGame: true, injuries: [...p.injuries, { id: uid(), kind: 'niggling', matchId: m.id, at: Date.now() }] })
-        else if (e.result === 'li') await db.players.update(p.id, { missNextGame: true, injuries: [...p.injuries, { id: uid(), kind: 'stat', stat: e.stat ?? 'av', matchId: m.id, at: Date.now() }] })
-      }
       for (const p of journeymen) {
         if (deadIds.has(p.id)) continue
         if (hire.includes(p.id)) await db.players.update(p.id, { status: 'active', journeyman: false, hiredAt: Date.now() })
@@ -105,6 +98,7 @@ export default function PostGame({ match: m }: { match: Match }) {
       await db.matches.update(m.id, {
         status: 'done', finishedAt: Date.now(), winnings, fansBefore: fans, fansAfter, mistakeResult: mistake, treasuryLoss: loss, treasuryAfter: after, hireJourneymen: hire,
       })
+      await syncMatchInjuries(m.id)
     })
     backupSoon(1000)
   }
@@ -161,7 +155,15 @@ export default function PostGame({ match: m }: { match: Match }) {
                   </option>
                 ))}
               </select>
-              {e.result === 'li' && <Badge tone="red">−1 {STAT_LABEL[e.stat ?? 'av']}</Badge>}
+              {e.result === 'li' && (
+                <select className="rounded-lg border border-red-400/30 bg-black/30 px-2 py-1.5 text-sm" value={e.stat ?? 'av'} onChange={(ev) => db.events.update(e.id, { stat: ev.target.value as Stat })}>
+                  {LASTING_INJURY.map((l) => (
+                    <option key={l.name} value={l.stat}>
+                      −1 {STAT_LABEL[l.stat]}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )
         })}
