@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getRoster } from '../rules/data'
+import { getRoster, ROSTERS } from '../rules/data'
 import { LEVEL_NAMES, STAT_LABEL } from '../rules/sevens'
 import type { Stat } from '../rules/types'
-import { approve, reject, removeMember, startData, useLeague, type LeagueData, type LeagueTeam } from '../logic/league'
-import { findTeam, headToHead, leagueGames, leaguePlayers, leagueTable, teamKey, type LeagueGame } from '../logic/leagueTable'
+import {
+  approve, deleteParticipant, linkParticipant, reject, removeMember, saveParticipant, setLeagueTeam, startData, useLeague, type LeagueData, type LeagueTeam, type Participant,
+} from '../logic/league'
+import { findTeam, headToHead, isPaper, leagueGames, leaguePlayers, leagueTable, paperTeams, participantTeam, teamKey, type LeagueGame, type PaperTeam } from '../logic/leagueTable'
 import { fmtTarget, playerValue, profile, statDelta, teamValue } from '../logic/team'
-import { computeStats, resultOf, teamRecord } from '../logic/stats'
+import { computeStats, teamRecord } from '../logic/stats'
 import { fmtDate, gp } from '../logic/format'
 import { LeagueJoin } from '../components/LeagueAccount'
-import { Badge, Button, Card, Empty, H2, Page, useSettings } from '../components/ui'
+import { Badge, Button, Card, Empty, Field, H2, inputCls, Page, Sheet, useSettings } from '../components/ui'
 import { PlayerRow } from './TeamPage'
 import { BOARDS } from './Stats'
 
@@ -50,7 +52,7 @@ export default function League() {
           </div>
           {tab === 'table' && <TableTab data={data!} games={games} />}
           {tab === 'results' && <ResultsTab data={data!} games={games} />}
-          {tab === 'teams' && <TeamsTab data={data!} />}
+          {tab === 'teams' && <TeamsTab data={data!} games={games} />}
           {tab === 'leaders' && <LeadersTab data={data!} games={games} />}
           {tab === 'admin' && <AdminTab data={data!} />}
         </>
@@ -63,11 +65,22 @@ const teamLink = (t: LeagueTeam) => `/league/${t.uid}/${t.team.id}`
 
 function TableTab({ data, games }: { data: LeagueData; games: LeagueGame[] }) {
   const nav = useNavigate()
-  const me = useLeague().user?.uid
+  const L = useLeague()
+  const me = L.user?.uid
+  const [paper, setPaper] = useState<string>()
   const rows = leagueTable(data, games)
-  if (!rows.length) return <Empty>No teams published yet.</Empty>
   return (
     <>
+      <PaperSheet data={data} games={games} paperKey={paper} onClose={() => setPaper(undefined)} />
+      <PickLeagueTeam data={data} />
+      {!data.participants.length && (
+        <div className="px-1 text-xs text-amber-300">
+          {L.isAdmin
+            ? '⚠️ Add the league’s coaches in Admin → Participants: games only count against coaches on that list.'
+            : '⚠️ The admin hasn’t filled in the participant list yet: games only count against coaches on it.'}
+        </div>
+      )}
+      {!rows.length && <Empty>No teams yet.</Empty>}
       <Card className="!p-1 overflow-x-auto">
         <table className="w-full text-sm tabular-nums">
           <thead>
@@ -83,11 +96,11 @@ function TableTab({ data, games }: { data: LeagueData; games: LeagueGame[] }) {
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.key} onClick={() => nav(teamLink(r.team))} className={`cursor-pointer border-t border-white/5 active:bg-white/5 ${r.team.uid === me ? 'bg-turf/10' : ''}`}>
+              <tr key={r.key} onClick={() => (r.team ? nav(teamLink(r.team)) : setPaper(r.key))} className={`cursor-pointer border-t border-white/5 active:bg-white/5 ${r.team?.uid === me ? 'bg-turf/10' : ''}`}>
                 <td className={`py-1.5 text-center font-black ${i === 0 && r.p > 0 ? 'text-gold' : 'text-white/40'}`}>{i + 1}</td>
                 <td className="max-w-[9rem] py-1.5">
-                  <div className="truncate font-semibold">{r.team.team.name}</div>
-                  <div className="truncate text-[11px] text-white/40">{r.team.coach}</div>
+                  <div className="truncate font-semibold">{r.name}</div>
+                  <div className="truncate text-[11px] text-white/40">{r.team ? r.coach : `📝 ${r.coach ? `${r.coach} · ` : ''}not in the app`}</div>
                 </td>
                 <td className="text-center">{r.p}</td>
                 <td className="whitespace-nowrap text-center">
@@ -106,17 +119,19 @@ function TableTab({ data, games }: { data: LeagueData; games: LeagueGame[] }) {
         </table>
       </Card>
       <div className="px-1 text-[11px] leading-relaxed text-white/40">
-        Win 3 · draw 1 · loss 0. Ties: TD difference, then CAS difference. Only games between two league teams count: pick the opponent from the league in pre-game (or use their exact team name).
-        A game both coaches logged counts once.
+        Win 3 · draw 1 · loss 0. Ties: TD difference, then CAS difference. A game both coaches logged counts once.
+        📝 = not in the app yet: their row has the games others logged against them. When they join, they pick their name from the league list and the games move to their team.
+        Games against opponents not on the list (friendlies) don’t count.
       </div>
     </>
   )
 }
 
-function GameCard({ g, data }: { g: LeagueGame; data: LeagueData }) {
+function GameCard({ g, data, onPaper }: { g: LeagueGame; data: LeagueData; onPaper?: (key: string) => void }) {
   const nav = useNavigate()
   const a = findTeam(data, g.a)
   const b = findTeam(data, g.b)
+  const paper = isPaper(g.b)
   const loggedBy = g.records.map((r) => data.coachName[r.uid] ?? '?')
   return (
     <Card className={`!p-2.5 ${g.mismatch ? 'border-red-400/50' : ''}`}>
@@ -128,16 +143,16 @@ function GameCard({ g, data }: { g: LeagueGame; data: LeagueData }) {
         <div className="text-xl font-black tabular-nums">
           {g.score.a}–{g.score.b}
         </div>
-        <button className="truncate text-right font-semibold" onClick={() => b && nav(teamLink(b))}>
-          {b?.team.name ?? g.guest}
-          <div className="truncate text-[11px] font-normal text-white/40">{b ? b.coach : 'guest'}</div>
+        <button className="truncate text-right font-semibold" onClick={() => (b ? nav(teamLink(b)) : paper && onPaper?.(g.b!))}>
+          {b?.team.name ?? g.paper?.name}
+          <div className="truncate text-[11px] font-normal text-white/40">{b ? b.coach : paper ? `📝 ${g.paper?.coach || 'not in the app'}` : g.paper?.coach || 'not on the list'}</div>
         </button>
       </div>
       <div className="mt-1 flex flex-wrap justify-between gap-1 text-[11px] text-white/40">
         <span>
           {fmtDate(g.date)} · CAS {g.cas.a}–{g.cas.b}
         </span>
-        <span>{g.b ? (g.records.length === 2 ? '✓ logged by both' : `logged by ${loggedBy[0]} only`) : 'not counted (guest)'}</span>
+        <span>{!g.b ? 'not counted: opponent not on the league list' : g.records.length === 2 ? '✓ logged by both' : `logged by ${loggedBy[0]}${paper ? '' : ' only'}`}</span>
       </div>
       {g.mismatch && <div className="mt-1 text-xs text-red-300">⚠️ {g.mismatch}. Fix the score in one of the match records.</div>}
     </Card>
@@ -145,23 +160,90 @@ function GameCard({ g, data }: { g: LeagueGame; data: LeagueData }) {
 }
 
 function ResultsTab({ data, games }: { data: LeagueData; games: LeagueGame[] }) {
+  const [paper, setPaper] = useState<string>()
   const flagged = games.filter((g) => g.mismatch)
   if (!games.length) return <Empty>No finished games published yet.</Empty>
   return (
     <>
+      <PaperSheet data={data} games={games} paperKey={paper} onClose={() => setPaper(undefined)} />
       {flagged.length > 0 && <div className="px-1 text-xs text-red-300">⚠️ {flagged.length} game{flagged.length > 1 ? 's' : ''} logged differently by the two coaches.</div>}
       {games.map((g) => (
-        <GameCard key={g.id} g={g} data={data} />
+        <GameCard key={g.id} g={g} data={data} onPaper={setPaper} />
       ))}
     </>
   )
 }
 
-function TeamsTab({ data }: { data: LeagueData }) {
+/** A participant not in the app yet: their games so far. */
+function PaperSheet({ data, games, paperKey, onClose }: { data: LeagueData; games: LeagueGame[]; paperKey?: string; onClose: () => void }) {
+  const pt: PaperTeam | undefined = paperKey ? paperTeams(data, games).find((x) => x.key === paperKey) : undefined
+  const joined = pt?.participant.uid
+  return (
+    <Sheet open={!!pt} onClose={onClose} title={pt?.name ?? ''}>
+      {pt && (
+        <div className="space-y-3 text-sm">
+          <div className="text-white/60">
+            📝 {joined ? `${data.coachName[joined] ?? pt.coach} has joined but hasn't published this team yet.` : `${pt.coach} isn't in the app yet.`}{' '}
+            {pt.games.length ? `These ${pt.games.length} game${pt.games.length > 1 ? 's' : ''} count from the other coaches' records:` : 'No games against them yet.'}
+          </div>
+          {pt.games.length > 0 && (
+            <Card className="!p-2 space-y-1">
+              {pt.games.map((g) => {
+                const a = findTeam(data, g.a)
+                return (
+                  <div key={g.id} className="flex justify-between gap-2 text-xs">
+                    <span className="truncate">
+                      {fmtDate(g.date)} · vs {a?.team.name} <span className="text-white/40">({a?.coach})</span>
+                    </span>
+                    <span className="shrink-0 font-bold tabular-nums">
+                      {g.score.b}–{g.score.a}
+                    </span>
+                  </div>
+                )
+              })}
+            </Card>
+          )}
+          {!joined && (
+            <div className="text-xs text-white/40">
+              When {pt.coach} joins the app, they pick “{pt.coach} · {pt.name}” in the join form. Once the admin approves, these games move to their team.
+            </div>
+          )}
+        </div>
+      )}
+    </Sheet>
+  )
+}
+
+/** I joined as a participant but have several published teams: which one plays in the league? */
+function PickLeagueTeam({ data }: { data: LeagueData }) {
+  const me = useLeague().user?.uid
+  const [busy, setBusy] = useState(false)
+  const p = data.participants.find((x) => x.uid === me && participantTeam(data, x).unsure)
+  if (!p) return null
+  return (
+    <Card className="space-y-2 border-gold/40">
+      <div className="text-sm">
+        Which of your teams plays in the league as <b>{p.team || p.coach}</b>?
+      </div>
+      {data.teams
+        .filter((t) => t.uid === me)
+        .map((t) => (
+          <Button key={t.team.id} variant="soft" className="w-full" disabled={busy} onClick={() => (setBusy(true), setLeagueTeam(t.team.id, p.id).finally(() => setBusy(false)))}>
+            {t.team.name}
+          </Button>
+        ))}
+    </Card>
+  )
+}
+
+function TeamsTab({ data, games }: { data: LeagueData; games: LeagueGame[] }) {
   const nav = useNavigate()
+  const [paper, setPaper] = useState<string>()
   const coaches = [...new Set([...data.members.map((m) => m.uid), ...data.teams.map((t) => t.uid)])]
+  const offApp = paperTeams(data, games)
   return (
     <>
+      <PaperSheet data={data} games={games} paperKey={paper} onClose={() => setPaper(undefined)} />
       {coaches.map((uid) => {
         const ts = data.teams.filter((t) => t.uid === uid)
         const member = data.members.some((m) => m.uid === uid)
@@ -196,6 +278,25 @@ function TeamsTab({ data }: { data: LeagueData }) {
           </div>
         )
       })}
+      {offApp.length > 0 && (
+        <div className="space-y-2">
+          <H2>📝 Not in the app yet</H2>
+          {offApp.map((pt) => (
+            <Card key={pt.key} onClick={() => setPaper(pt.key)}>
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <div className="min-w-0">
+                  <div className="truncate font-bold">{pt.name}</div>
+                  <div className="text-xs text-white/50">
+                    {pt.coach}
+                    {pt.participant.rosterId ? ` · ${getRoster(pt.participant.rosterId)?.name ?? ''}` : ''}
+                  </div>
+                </div>
+                <span className="shrink-0 text-xs text-white/40">{pt.games.length} games</span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </>
   )
 }
@@ -259,6 +360,8 @@ function LeadersTab({ data, games }: { data: LeagueData; games: LeagueGame[] }) 
 function AdminTab({ data }: { data: LeagueData }) {
   const L = useLeague()
   const [busy, setBusy] = useState(false)
+  const [pick, setPick] = useState<Record<string, string>>({})
+  const [edit, setEdit] = useState<Partial<Participant>>()
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true)
     try {
@@ -269,26 +372,71 @@ function AdminTab({ data }: { data: LeagueData }) {
       setBusy(false)
     }
   }
+  const free = data.participants.filter((p) => !p.uid).sort((a, b) => a.coach.localeCompare(b.coach))
+  const label = (p: Participant) => `${p.coach}${p.team ? ` · ${p.team}` : ''}`
   return (
     <>
+      <ParticipantSheet data={data} p={edit} onClose={() => setEdit(undefined)} />
       <H2>Join requests</H2>
       {!L.requests?.length && <div className="px-1 text-sm text-white/40">No pending requests.</div>}
-      {L.requests?.map((r) => (
-        <Card key={r.uid} className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold">{r.coach}</div>
-            <div className="text-[11px] text-white/40">
-              {r.requestedAt ? fmtDate(r.requestedAt) : ''} · {r.uid.slice(0, 8)}…
+      {L.requests?.map((r) => {
+        const asked = free.some((p) => p.id === r.participant) ? r.participant! : ''
+        const pid = pick[r.uid] ?? asked
+        return (
+          <Card key={r.uid} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-semibold">{r.coach}</div>
+                <div className="text-[11px] text-white/40">
+                  {r.requestedAt ? fmtDate(r.requestedAt) : ''} · {r.uid.slice(0, 8)}…
+                </div>
+              </div>
+              <Button className="!px-3 !py-1.5" disabled={busy} onClick={() => run(() => approve(r.uid, r.coach, pid || undefined))}>
+                Approve
+              </Button>
+              <Button variant="ghost" className="!px-2 !py-1.5 text-red-300" disabled={busy} onClick={() => confirm(`Reject ${r.coach}?`) && run(() => reject(r.uid))}>
+                ✕
+              </Button>
             </div>
-          </div>
-          <Button className="!px-3 !py-1.5" disabled={busy} onClick={() => run(() => approve(r.uid, r.coach))}>
-            Approve
-          </Button>
-          <Button variant="ghost" className="!px-2 !py-1.5 text-red-300" disabled={busy} onClick={() => confirm(`Reject ${r.coach}?`) && run(() => reject(r.uid))}>
-            ✕
-          </Button>
+            {data.participants.length > 0 && (
+              <label className="block text-[11px] text-white/50">
+                {r.participant && !asked ? '⚠️ The entry they picked is gone or taken. ' : ''}Plays in the league as
+                <select className={`${inputCls} mt-1 !py-1.5 text-sm`} value={pid} onChange={(e) => setPick({ ...pick, [r.uid]: e.target.value })}>
+                  <option value="">– not on the list –</option>
+                  {free.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {label(p)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </Card>
+        )
+      })}
+      <H2 right={<button className="text-xs text-gold" onClick={() => setEdit({ coach: '', team: '' })}>+ Add</button>}>Participants</H2>
+      {!data.participants.length && <div className="px-1 text-sm text-white/40">No participants yet. Add every coach in the league, in the app or not.</div>}
+      {data.participants.length > 0 && (
+        <Card className="!p-1">
+          {[...data.participants]
+            .sort((a, b) => a.coach.localeCompare(b.coach))
+            .map((p) => {
+              const { team } = participantTeam(data, p)
+              return (
+                <button key={p.id} onClick={() => setEdit(p)} className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-left text-sm active:bg-white/5">
+                  <span className="min-w-0 truncate">
+                    {label(p)}
+                    {p.rosterId && <span className="text-xs text-white/40"> · {getRoster(p.rosterId)?.name}</span>}
+                  </span>
+                  <span className="shrink-0 text-xs text-white/40">{p.uid ? `✓ ${team ? team.team.name : `${data.coachName[p.uid] ?? '?'}, no team yet`}` : '📝'}</span>
+                </button>
+              )
+            })}
         </Card>
-      ))}
+      )}
+      <div className="px-1 text-[11px] leading-relaxed text-white/40">
+        Games only count against coaches on this list. A joining coach picks their entry; you confirm it when approving. 📝 = not in the app yet.
+      </div>
       <H2>Members</H2>
       <Card className="space-y-1.5">
         {data.members.map((m) => (
@@ -319,6 +467,75 @@ function AdminTab({ data }: { data: LeagueData }) {
   )
 }
 
+/** Admin: add or edit a participant-list entry, and who it is in the app. */
+function ParticipantSheet({ data, p, onClose }: { data: LeagueData; p?: Partial<Participant>; onClose: () => void }) {
+  const [f, setF] = useState<Partial<Participant>>({})
+  const [busy, setBusy] = useState(false)
+  useEffect(() => setF(p ?? {}), [p])
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true)
+    try {
+      await fn()
+      onClose()
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const coach = (f.coach ?? '').trim()
+  return (
+    <Sheet open={!!p} onClose={onClose} title={p?.id ? 'Participant' : 'Add participant'}>
+      <div className="space-y-3">
+        <Field label="Coach">
+          <input className={inputCls} placeholder="Coach name" maxLength={40} value={f.coach ?? ''} onChange={(e) => setF({ ...f, coach: e.target.value })} />
+        </Field>
+        <Field label="Team name">
+          <input className={inputCls} placeholder="Team name" maxLength={60} value={f.team ?? ''} onChange={(e) => setF({ ...f, team: e.target.value })} />
+        </Field>
+        <Field label="Roster">
+          <select className={inputCls} value={f.rosterId ?? ''} onChange={(e) => setF({ ...f, rosterId: e.target.value || undefined })}>
+            <option value="">–</option>
+            {ROSTERS.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {p?.id && (
+          <Field label="In the app as">
+            <select className={inputCls} value={p.uid ?? ''} disabled={busy} onChange={(e) => run(() => linkParticipant(p.id!, e.target.value || null))}>
+              <option value="">– not in the app yet –</option>
+              {data.members.map((m) => (
+                <option key={m.uid} value={m.uid}>
+                  {m.coach}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <Button className="w-full" disabled={busy || !coach} onClick={() => run(() => saveParticipant({ id: p?.id, coach, team: (f.team ?? '').trim(), rosterId: f.rosterId }))}>
+          Save
+        </Button>
+        {p?.id && (
+          <Button
+            variant="ghost"
+            className="w-full text-red-300"
+            disabled={busy}
+            onClick={() => confirm(`Remove ${p.coach} from the participant list? Games against them stop counting (unless the opponent is in the app).`) && run(() => deleteParticipant(p.id!))}
+          >
+            Remove from list
+          </Button>
+        )}
+        <div className="text-[11px] leading-relaxed text-white/40">
+          Games other coaches logged with this team name (or coach name) count against this entry. Once linked to a coach in the app, they count for their team.
+        </div>
+      </div>
+    </Sheet>
+  )
+}
+
 // ---------- read-only team & player ----------
 
 function useLeagueTeam() {
@@ -339,7 +556,16 @@ export function LeagueTeamPage() {
   const ms = data!.matches.filter((m) => m.uid === t.uid && m.match.teamId === team.id)
   const stats = computeStats(t.players, ms.map((m) => m.match), ms.flatMap((m) => m.events), settings)
   const { tv, ctv } = teamValue(team, t.players)
-  const rec = teamRecord(ms.map((m) => m.match))
+  const key = teamKey({ uid: t.uid, teamId: team.id })
+  // league view of this team's games: its own records plus games others logged against it (paired once)
+  const games = leagueGames(data!)
+    .filter((g) => g.a === key || g.b === key)
+    .map((g) => {
+      const home = g.a === key
+      const opp = home ? (findTeam(data, g.b) ?? (g.paper && { team: { name: g.paper.name }, coach: g.paper.coach })) : findTeam(data, g.a)
+      return { g, us: home ? g.score.a : g.score.b, them: home ? g.score.b : g.score.a, opp, mine: g.records.some((r) => r.uid === t.uid) }
+    })
+  const rec = { w: games.filter((x) => x.us > x.them).length, d: games.filter((x) => x.us === x.them).length, l: games.filter((x) => x.us < x.them).length }
   const active = t.players.filter((p) => p.status === 'active').sort((a, b) => a.number - b.number)
   const gone = t.players.filter((p) => ['dead', 'retired', 'fired', 'scouted'].includes(p.status))
   return (
@@ -380,32 +606,31 @@ export function LeagueTeamPage() {
         </>
       )}
       <H2>Games</H2>
-      {ms.length === 0 && <div className="px-1 text-sm text-white/40">No finished games published.</div>}
-      {[...ms]
-        .sort((a, b) => b.match.date - a.match.date)
-        .map(({ match: m }) => {
-          const r = resultOf(m)
-          return (
-            <Card key={m.id} className="!p-2.5">
-              <div className="flex items-center justify-between text-sm">
-                <div>
-                  <div className="font-semibold">vs {m.opponent.name || 'Opponent'}</div>
-                  <div className="text-[11px] text-white/40">
-                    {fmtDate(m.date)}
-                    {m.opponent.coach ? ` · ${m.opponent.coach}` : ''}
-                    {m.weather ? ` · ${m.weather}` : ''}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge tone={r === 'W' ? 'green' : r === 'L' ? 'red' : 'default'}>{r}</Badge>
-                  <span className="text-lg font-black tabular-nums">
-                    {m.score.us}–{m.score.them}
-                  </span>
+      {games.length === 0 && <div className="px-1 text-sm text-white/40">No finished games published.</div>}
+      {games.map(({ g, us, them, opp, mine }) => {
+        const r = us > them ? 'W' : us < them ? 'L' : 'D'
+        return (
+          <Card key={g.id} className="!p-2.5">
+            <div className="flex items-center justify-between text-sm">
+              <div className="min-w-0">
+                <div className="truncate font-semibold">vs {opp?.team.name || 'Opponent'}</div>
+                <div className="truncate text-[11px] text-white/40">
+                  {fmtDate(g.date)}
+                  {opp?.coach ? ` · ${opp.coach}` : ''}
+                  {!mine ? ` · logged by ${g.records.map((x) => data!.coachName[x.uid] ?? '?').join(', ')}` : ''}
+                  {g.b === null ? ' · not counted' : ''}
                 </div>
               </div>
-            </Card>
-          )
-        })}
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge tone={r === 'W' ? 'green' : r === 'L' ? 'red' : 'default'}>{r}</Badge>
+                <span className="text-lg font-black tabular-nums">
+                  {us}–{them}
+                </span>
+              </div>
+            </div>
+          </Card>
+        )
+      })}
     </Page>
   )
 }

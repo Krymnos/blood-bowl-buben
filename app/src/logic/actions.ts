@@ -55,7 +55,7 @@ export async function changeStaff(team: Team, key: StaffKey, next: number | bool
   const cur = Number(team[key] ?? 0)
   const diff = Number(next) - cur
   const delta = diff > 0 ? -diff * cost[key] : draft ? -diff * cost[key] : 0
-  await db.teams.update(team.id, { [key]: next, treasury: team.treasury + delta })
+  await db.teams.update(team.id, { [key]: next, treasury: team.treasury + delta } as Partial<typeof team>)
 }
 
 export async function startMatch(teamId: number) {

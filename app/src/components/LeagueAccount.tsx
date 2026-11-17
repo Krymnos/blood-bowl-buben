@@ -25,6 +25,8 @@ export function LeagueJoin() {
   const L = useLeague()
   const myCoach = useLiveQuery(async () => (await db.teams.toArray()).find((t) => t.coach)?.coach ?? '', [])
   const [coach, setCoach] = useState<string>()
+  // participant-list entry picked in the join form; '' = "I'm not on the list"
+  const [pid, setPid] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string>()
   const run = async (fn: () => Promise<unknown>) => {
@@ -38,7 +40,9 @@ export function LeagueJoin() {
       setBusy(false)
     }
   }
-  const name = (coach ?? myCoach ?? '').trim()
+  const free = (L.participants ?? []).filter((p) => !p.uid).sort((a, b) => a.coach.localeCompare(b.coach))
+  const chosen = free.find((p) => p.id === pid)
+  const name = (chosen ? chosen.coach : (coach ?? myCoach ?? '')).trim()
 
   if (!L.user) {
     return (
@@ -94,8 +98,28 @@ export function LeagueJoin() {
           </div>
         )}
         <div className="text-sm">{L.isAdmin ? 'You are the league admin. Pick your coach name to start the league:' : 'Ask to join the Blood Bowl Buben league:'}</div>
-        <input className={inputCls} placeholder="Your coach name" maxLength={40} value={coach ?? myCoach ?? ''} onChange={(e) => setCoach(e.target.value)} />
-        <Button className="w-full" disabled={busy || !name} onClick={() => run(() => requestJoin(name))}>
+        {free.length > 0 && (
+          <div className="space-y-1">
+            <div className="text-xs text-white/60">Who are you? Pick your name from the league list:</div>
+            {free.map((p) => (
+              <button
+                key={p.id}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm ${pid === p.id ? 'bg-turf/30 ring-1 ring-turf' : 'bg-white/5'}`}
+                onClick={() => setPid(p.id)}
+              >
+                <b>{p.coach}</b>
+                {p.team && <span className="text-white/50"> · {p.team}</span>}
+              </button>
+            ))}
+            <button className={`w-full rounded-xl px-3 py-2 text-left text-sm ${pid === '' ? 'bg-turf/30 ring-1 ring-turf' : 'bg-white/5 text-white/60'}`} onClick={() => setPid('')}>
+              I'm not on the list
+            </button>
+          </div>
+        )}
+        {(!free.length || pid === '') && (
+          <input className={inputCls} placeholder="Your coach name" maxLength={40} value={coach ?? myCoach ?? ''} onChange={(e) => setCoach(e.target.value)} />
+        )}
+        <Button className="w-full" disabled={busy || !name || (free.length > 0 && pid === undefined)} onClick={() => run(() => requestJoin(name, chosen?.id))}>
           {L.isAdmin ? 'Join as admin' : 'Request to join'}
         </Button>
         {uidLine}

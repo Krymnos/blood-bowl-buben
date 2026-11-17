@@ -5,8 +5,8 @@
 import { initializeApp } from 'firebase/app'
 import { connectAuthEmulator, getAuth, getRedirectResult, signInWithEmailAndPassword, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut as fbSignOut, type User } from 'firebase/auth'
 import {
-  collection, collectionGroup, connectFirestoreEmulator, deleteDoc, doc, getDocFromServer, getDocsFromServer, initializeFirestore, onSnapshot, persistentLocalCache,
-  persistentMultipleTabManager, serverTimestamp, setDoc, writeBatch, type DocumentData, type QuerySnapshot, type Timestamp,
+  collection, collectionGroup, connectFirestoreEmulator, deleteDoc, deleteField, doc, getDocFromServer, getDocsFromServer, initializeFirestore, onSnapshot, persistentLocalCache,
+  persistentMultipleTabManager, serverTimestamp, setDoc, updateDoc, writeBatch, type DocumentData, type QuerySnapshot, type Timestamp,
 } from 'firebase/firestore'
 import { firebaseConfig } from '../league.config'
 
@@ -61,19 +61,28 @@ export function watchMembership(uid: string, cb: (member: Presence, request: Pre
   return () => (u1(), u2())
 }
 
-export const requestJoin = (uid: string, coach: string) => setDoc(doc(fs, 'requests', uid), { coach, requestedAt: serverTimestamp() })
+/** `participant`: the entry on the league's participant list this coach says they are (the admin confirms it) */
+export const requestJoin = (uid: string, coach: string, participant?: string) =>
+  setDoc(doc(fs, 'requests', uid), { coach, ...(participant ? { participant } : {}), requestedAt: serverTimestamp() })
 export const withdrawRequest = (uid: string) => deleteDoc(doc(fs, 'requests', uid))
 
 // ---------- admin ----------
 
-export async function approve(uid: string, coach: string) {
+/** Approve a join request, linking the coach to their participant-list entry (if any). */
+export async function approve(uid: string, coach: string, pid?: string) {
   const b = writeBatch(fs)
   b.set(doc(fs, 'members', uid), { coach, joinedAt: serverTimestamp() })
+  if (pid) b.update(doc(fs, 'participants', pid), { uid })
   b.delete(doc(fs, 'requests', uid))
   await b.commit()
 }
 /** The admin adds themselves (no request needed). */
-export const addMember = (uid: string, coach: string) => setDoc(doc(fs, 'members', uid), { coach, joinedAt: serverTimestamp() })
+export async function addMember(uid: string, coach: string, pid?: string) {
+  const b = writeBatch(fs)
+  b.set(doc(fs, 'members', uid), { coach, joinedAt: serverTimestamp() })
+  if (pid) b.update(doc(fs, 'participants', pid), { uid })
+  await b.commit()
+}
 export const rejectRequest = (uid: string) => deleteDoc(doc(fs, 'requests', uid))
 export async function removeMember(uid: string, wipeData: boolean) {
   await deleteDoc(doc(fs, 'members', uid))
@@ -86,10 +95,36 @@ export async function removeMember(uid: string, wipeData: boolean) {
   await commitInChunks(refs.map((ref) => (b) => b.delete(ref)))
 }
 
-export interface RequestRow { uid: string; coach: string; requestedAt?: number }
+export interface RequestRow { uid: string; coach: string; participant?: string; requestedAt?: number }
 export function watchRequests(cb: (rows: RequestRow[]) => void, onError: (e: Error) => void) {
-  return onSnapshot(collection(fs, 'requests'), (s) => cb(s.docs.map((d) => ({ uid: d.id, coach: d.data().coach, requestedAt: ms(d.data().requestedAt) }))), onError)
+  return onSnapshot(
+    collection(fs, 'requests'),
+    (s) => cb(s.docs.map((d) => ({ uid: d.id, coach: d.data().coach, participant: d.data().participant, requestedAt: ms(d.data().requestedAt) }))),
+    onError,
+  )
 }
+
+// ---------- participant list (admin writes, every signed-in user reads: the join form needs it) ----------
+
+export interface Participant { id: string; coach: string; team: string; rosterId?: string; uid?: string }
+export function watchParticipants(cb: (rows: Participant[]) => void, onError: (e: Error) => void) {
+  return onSnapshot(
+    collection(fs, 'participants'),
+    (s) =>
+      cb(s.docs.map((d) => {
+        const x = d.data()
+        return { id: d.id, coach: x.coach, team: x.team ?? '', rosterId: x.rosterId || undefined, uid: x.uid || undefined }
+      })),
+    onError,
+  )
+}
+export async function putParticipant(p: { id?: string; coach: string; team: string; rosterId?: string }) {
+  const ref = p.id ? doc(fs, 'participants', p.id) : doc(collection(fs, 'participants'))
+  const data = { coach: p.coach, team: p.team, rosterId: p.rosterId ?? '' }
+  await (p.id ? updateDoc(ref, data) : setDoc(ref, { ...data, createdAt: serverTimestamp() }))
+}
+export const deleteParticipant = (id: string) => deleteDoc(doc(fs, 'participants', id))
+export const linkParticipant = (id: string, uid: string | null) => updateDoc(doc(fs, 'participants', id), { uid: uid ?? deleteField() })
 
 // ---------- league data (read) ----------
 

@@ -7,7 +7,9 @@ import { useSyncExternalStore } from 'react'
 import { db, type Match, type MatchEvent, type Player, type Team } from '../db'
 import { ADMIN_UID, LEAGUE_BACKUP_PATH } from '../league.config'
 import { hasCloud, hashOf, onBackup, putFile } from './cloud'
-import type { FbUser, Op, RawLeague, RequestRow } from './fb'
+import type { FbUser, Op, Participant, RawLeague, RequestRow } from './fb'
+
+export type { Participant }
 
 export type Membership = 'unknown' | 'none' | 'requested' | 'member'
 
@@ -15,6 +17,8 @@ export interface LeagueTeam { uid: string; coach: string; team: Team; players: P
 export interface LeagueMatch { uid: string; match: Match; events: MatchEvent[]; updatedAt?: number }
 export interface LeagueData {
   members: { uid: string; coach: string; joinedAt?: number }[]
+  /** the league's participant list (admin-made): every coach in the league, in the app or not */
+  participants: Participant[]
   coachName: Record<string, string>
   teams: LeagueTeam[]
   matches: LeagueMatch[]
@@ -40,6 +44,8 @@ export interface LeagueState {
   data?: LeagueData
   dataError?: string
   requests?: RequestRow[]
+  /** participant list, live while signed in (also before joining: the join form picks from it) */
+  participants?: Participant[]
   error?: string
 }
 
@@ -85,6 +91,7 @@ let fbP: Promise<typeof import('./fb')> | undefined
 const fb = () => (fbP ??= import('./fb'))
 let stopMembership: (() => void) | undefined
 let stopRequests: (() => void) | undefined
+let stopParticipants: (() => void) | undefined
 
 async function start() {
   if (fbP) return fb()
@@ -105,17 +112,22 @@ async function start() {
 function onUser(user: FbUser | null) {
   stopMembership?.()
   stopRequests?.()
+  stopParticipants?.()
   stopData()
-  stopMembership = stopRequests = undefined
+  stopMembership = stopRequests = stopParticipants = undefined
   const isAdmin = !!user && !!ADMIN_UID && user.uid === ADMIN_UID
   reconciled = false
-  set({ user, isAdmin, membership: user ? 'unknown' : 'none', coach: undefined, requests: undefined, data: undefined })
+  set({ user, isAdmin, membership: user ? 'unknown' : 'none', coach: undefined, requests: undefined, participants: undefined, data: undefined })
   if (!user) return
   if (!state.enabled) {
     localStorage.setItem(K.on, 'true')
     set({ enabled: true })
   }
   void fb().then((api) => {
+    stopParticipants = api.watchParticipants(
+      (participants) => set({ participants, data: state.data && { ...state.data, participants } }),
+      () => {},
+    )
     stopMembership = api.watchMembership(
       user.uid,
       (member, request) => {
@@ -151,17 +163,29 @@ export async function signOut() {
 
 // ---------- joining ----------
 
-export async function requestJoin(coach: string) {
+/** `pid`: the participant-list entry this coach picked ("who are you?") */
+export async function requestJoin(coach: string, pid?: string) {
   const api = await fb()
   const uid = state.user!.uid
   // the admin doesn't need approval
-  if (state.isAdmin) await api.addMember(uid, coach)
-  else await api.requestJoin(uid, coach)
+  if (state.isAdmin) await api.addMember(uid, coach, pid)
+  else await api.requestJoin(uid, coach, pid)
 }
 export const withdrawRequest = async () => (await fb()).withdrawRequest(state.user!.uid)
-export const approve = async (uid: string, coach: string) => (await fb()).approve(uid, coach)
+export const approve = async (uid: string, coach: string, pid?: string) => (await fb()).approve(uid, coach, pid)
 export const reject = async (uid: string) => (await fb()).rejectRequest(uid)
-export const removeMember = async (uid: string, wipe: boolean) => (await fb()).removeMember(uid, wipe)
+/** Wiping their data also frees their participant-list entry (so they could join again under it). */
+export async function removeMember(uid: string, wipe: boolean) {
+  const api = await fb()
+  await api.removeMember(uid, wipe)
+  if (wipe) for (const p of state.participants ?? []) if (p.uid === uid) await api.linkParticipant(p.id, null)
+}
+
+// ---------- participant list (admin) ----------
+
+export const saveParticipant = async (p: { id?: string; coach: string; team: string; rosterId?: string }) => (await fb()).putParticipant(p)
+export const deleteParticipant = async (id: string) => (await fb()).deleteParticipant(id)
+export const linkParticipant = async (id: string, uid: string | null) => (await fb()).linkParticipant(id, uid)
 
 // ---------- reading the league ----------
 
@@ -198,6 +222,7 @@ function toLeague(raw: RawLeague): LeagueData {
   for (const m of raw.members) coachName[m.uid] = m.coach
   return {
     members: raw.members,
+    participants: state.participants ?? [],
     coachName,
     teams: raw.teams.map((t) => ({ uid: t.uid, coach: coachName[t.uid] ?? '?', team: t.data.team, players: t.data.players ?? [], updatedAt: t.updatedAt })),
     matches: raw.matches.map((m) => ({ uid: m.uid, match: m.data.match, events: m.data.events ?? [], updatedAt: m.updatedAt })),
@@ -307,6 +332,7 @@ export function buildLeagueBackup(d: LeagueData) {
     version: 1,
     exportedAt: new Date().toISOString(),
     members: d.members,
+    participants: d.participants,
     teams: d.teams.map((t) => ({ uid: t.uid, coach: t.coach, team: t.team, players: t.players })),
     matches: d.matches.map((m) => ({ uid: m.uid, match: m.match, events: m.events })),
   }
@@ -362,4 +388,18 @@ export function initLeague() {
   // after the admin's own GitHub backup, also refresh the league backup
   onBackup(() => leagueBackupSoon(5_000))
   if (state.enabled) start().catch(() => {})
+}
+
+/**
+ * Which of this phone's teams plays as participant `pid` in the league (only asked when the coach has several
+ * published teams and none has the entry's name). Published right away.
+ */
+export async function setLeagueTeam(teamId: number, pid: string) {
+  await db.transaction('rw', db.teams, async () => {
+    for (const t of await db.teams.toArray()) {
+      if (t.id === teamId) await db.teams.update(t.id, { leaguePid: pid })
+      else if (t.leaguePid === pid) await db.teams.update(t.id, { leaguePid: undefined })
+    }
+  })
+  await syncNow().catch(() => {})
 }

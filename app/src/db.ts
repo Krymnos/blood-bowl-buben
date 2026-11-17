@@ -24,6 +24,8 @@ export interface Team {
   lawyerUsed?: boolean
   /** the Star Player this team may hire before each match */
   starPlayer?: { name: string; cost: number; notes?: string }
+  /** League: the participant-list entry this team plays as (only needed when the coach has several published teams) */
+  leaguePid?: string
 }
 
 export interface Advancement {
@@ -88,8 +90,11 @@ export interface Match {
   teamId: number
   date: number
   status: MatchStatus
-  /** ref = the opponent's team in the league (picked from league teams), absent for guests */
-  opponent: { name: string; coach: string; rosterId: string; ctv: number; ref?: LeagueRef }
+  /**
+   * ref = the opponent's team in the app (picked from the league), pid = their entry on the league's participant list
+   * (also for coaches not in the app yet). Typed opponents without either are matched to the list by team name.
+   */
+  opponent: { name: string; coach: string; rosterId: string; ctv: number; ref?: LeagueRef; pid?: string }
   ourCtv: number
   /** players eligible to play this game (snapshot at setup) */
   played: number[]

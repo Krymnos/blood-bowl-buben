@@ -2,7 +2,7 @@ rules_version = '2';
 
 // Blood Bowl Buben league sync. See docs/LEAGUE-SYNC-FIREBASE.md.
 // Members read everything; each coach writes only under coaches/{their uid}.
-// Signed-in strangers may only create their own join request. Everyone else gets nothing.
+// Signed-in strangers may only read the participant list and create their own join request. Everyone else gets nothing.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -34,10 +34,24 @@ service cloud.firestore {
       allow get: if isSelf(uid) || isAdmin();
       allow list: if isAdmin();
       allow create, update: if isSelf(uid)
-        && request.resource.data.keys().hasOnly(['coach', 'requestedAt'])
+        && request.resource.data.keys().hasOnly(['coach', 'participant', 'requestedAt'])
         && validCoach(request.resource.data.coach)
+        && (!('participant' in request.resource.data) || (request.resource.data.participant is string && request.resource.data.participant.size() <= 40))
         && request.resource.data.requestedAt == request.time;
       allow delete: if isSelf(uid) || isAdmin();
+    }
+
+    // The league's participant list: every coach in the league, in the app or not (coach + team name,
+    // and the uid once they joined). Signed-in users read it so the join form can offer "who are you?".
+    match /participants/{pid} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['coach', 'team', 'rosterId', 'uid', 'createdAt'])
+        && validCoach(request.resource.data.coach)
+        && request.resource.data.team is string && request.resource.data.team.size() <= 60
+        && (!('rosterId' in request.resource.data) || (request.resource.data.rosterId is string && request.resource.data.rosterId.size() <= 40))
+        && (!('uid' in request.resource.data) || (request.resource.data.uid is string && request.resource.data.uid.size() <= 128));
+      allow delete: if isAdmin();
     }
 
     // Each coach's published data. Owner writes (while a member), members read, admin may clean up.

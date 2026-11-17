@@ -35,7 +35,7 @@ const check = (ok, msg) => {
 // reset emulators, create users with fixed uids
 await fetch('http://127.0.0.1:8181/emulator/v1/projects/demo-buben/databases/(default)/documents', { method: 'DELETE' })
 await fetch('http://127.0.0.1:9099/emulator/v1/projects/demo-buben/accounts', { method: 'DELETE' })
-for (const [localId, email] of [['admin-uid', 'ron@example.com'], ['max-uid', 'max@example.com']]) {
+for (const [localId, email] of [['admin-uid', 'ron@example.com'], ['max-uid', 'max@example.com'], ['lena-uid', 'lena@example.com']]) {
   const r = await fetch(`${AUTH}/accounts`, { method: 'POST', headers: owner, body: JSON.stringify({ localId, email, password: 'secret123', displayName: localId }) })
   if (!r.ok) throw new Error(await r.text())
 }
@@ -101,13 +101,33 @@ const coachDoc = await fsGet('coaches/admin-uid')
 check(coachDoc.fields?.coach?.stringValue === 'Ron' && Object.keys(coachDoc.fields).sort().join() === 'coach,device,updatedAt', 'coach doc has coach name + device, nothing else')
 check(!JSON.stringify(coachDoc).includes('example.com'), 'no email stored')
 
+// 1b. admin fills in the participant list (coaches in the app or not)
+await click(A, 'admin')
+for (const [coach, team] of [['Max', 'Reikland Reserves'], ['Lena', "Grimgut's Gobbos"], ['Olaf', 'Nordmänner']]) {
+  await click(A, '+ Add')
+  await waitText(A, 'Add participant')
+  await typeInto(A, 'Coach name', coach)
+  await typeInto(A, 'Team name', team)
+  await click(A, 'Save')
+  await waitText(A, team)
+}
+await sleep(1000)
+check((await fsList('participants')).length === 3, 'participant list saved')
+await click(A, 'table')
+await sleep(800)
+const tblA = await text(A)
+check(/reikland reserves\s+📝 max · not in the app\s+1\s/.test(tblA) && /nordmänner\s+📝 olaf · not in the app\s+0\s/.test(tblA), 'listed coaches not in the app get rows (with the games logged against them, or none yet)')
+await A.shot('table-list')
+
 // 2. coach requests to join
 const B = await phone('max')
 await setup(B, 'max@example.com')
-check(await waitText(B, 'Ask to join'), 'non-member sees join form')
-await typeInto(B, 'Your coach name', 'Max')
+check(await waitText(B, 'Who are you?'), 'non-member sees join form with the participant list')
+await B.shot('join')
+await click(B, 'Reikland Reserves')
 await click(B, 'Request to join')
 check(await waitText(B, 'Join request sent as Max'), 'request pending')
+check((await fsGet('requests/max-uid')).fields?.participant?.stringValue?.length > 0, 'request names the picked participant')
 check((await fsList('coaches/max-uid/teams')).length === 0, 'non-member published nothing')
 
 // 3. admin approves
@@ -115,8 +135,12 @@ await A.evaluate(() => (location.hash = '#/league'))
 await click(A, 'admin')
 check(await waitText(A, 'Max'), 'admin sees the request')
 await A.shot('admin-tab')
+check(await A.$eval('select', (x) => x.options[x.selectedIndex].text) === 'Max · Reikland Reserves', 'approve form preselects the entry the coach picked')
 await click(A, 'Approve')
 check(await waitText(B, 'Leaders', 15000), 'coach becomes member live (no reload)')
+const pids = await fsList('participants')
+const linked = await Promise.all(pids.map((id) => fsGet(`participants/${id}`)))
+check(linked.filter((x) => x.fields.uid?.stringValue === 'max-uid').length === 1, 'approval links Max to his entry')
 await sleep(6000)
 check((await fsList('coaches/max-uid/teams')).length === 1, 'coach published their team after approval')
 
@@ -127,6 +151,8 @@ await sleep(1500)
 await B.shot('table')
 const tbl = await text(B)
 check(tbl.includes('ron') && tbl.includes('max'), 'table lists both coaches’ teams')
+check(!tbl.includes('reikland reserves') && /gearwhackers\s+max\s+2\s/.test(tbl), 'games logged against “Reikland Reserves” moved to Max’s team')
+check(/grimgut's gobbos\s+📝 lena · not in the app\s+2\s/.test(tbl), 'Lena (not in the app) has the 2 games Ron and Max logged against her')
 await click(B, 'teams')
 await sleep(500)
 await B.shot('teams')
@@ -151,8 +177,9 @@ await homeCards[homeCards.length - 1].click()
 await sleep(500)
 await click(B, 'games')
 await click(B, 'New match')
-await click(B, 'Pick from league teams')
-check(await waitText(B, 'League teams'), 'picker sheet opens')
+await click(B, 'Pick from the league')
+check(await waitText(B, 'League opponents'), 'picker sheet opens')
+check((await text(B)).includes('nordmänner') && (await text(B)).includes('not in the app'), 'picker lists participants not in the app')
 await B.shot('picker')
 const ronTeam = (await (await fetch(`${FS}/coaches/admin-uid/teams/${aTeams[0]}`, { headers: owner })).json()).fields.team.mapValue.fields.name.stringValue
 await click(B, ronTeam, 'button.flex')
@@ -160,6 +187,43 @@ await sleep(800)
 const oppName = await B.$eval('input[placeholder="e.g. Reikland Reserves"]', (x) => x.value)
 check(oppName === ronTeam && (await text(B)).includes('linked to league team'), `opponent filled from league (${oppName}) and linked`)
 await B.shot('pregame-linked')
+
+// 5b. a coach who played on paper joins later: picks her entry, her games move to her team
+const C = await phone('lena')
+await setup(C, 'lena@example.com')
+check(await waitText(C, 'Who are you?'), 'Lena sees join form')
+// her phone: one team under another name, no games of her own
+await C.evaluate(() => new Promise((res, rej) => {
+  const r = indexedDB.open('sevens-dugout')
+  r.onerror = rej
+  r.onsuccess = () => {
+    const tx = r.result.transaction(['teams', 'matches', 'events'], 'readwrite')
+    tx.objectStore('matches').clear()
+    tx.objectStore('events').clear()
+    const ts = tx.objectStore('teams')
+    ts.getAll().onsuccess = (e) => e.target.result.forEach((t) => ts.put({ ...t, name: 'Grünhaut Gang', coach: 'Lena' }))
+    tx.oncomplete = () => (r.result.close(), res())
+  }
+}))
+await C.reload({ waitUntil: 'domcontentloaded' })
+await waitText(C, 'Who are you?')
+check(!(await text(C)).includes('reikland reserves'), 'taken entries are not offered')
+await click(C, "Grimgut's Gobbos")
+await click(C, 'Request to join')
+await A.evaluate(() => (location.hash = '#/league'))
+await click(A, 'admin')
+await waitText(A, 'Plays in the league as')
+await A.shot('approve-lena')
+await click(A, 'Approve')
+check(await waitText(C, 'Leaders', 15000), 'Lena becomes member')
+await sleep(6000)
+await click(C, 'table')
+await sleep(1000)
+const tblC = await text(C)
+check(!tblC.includes("grimgut's gobbos") && /grünhaut gang\s+lena\s+2\s/.test(tblC), 'Lena’s team has the 2 games others logged against her')
+await C.shot('joined-table')
+await click(A, 'table')
+check(await waitText(A, 'Grünhaut Gang'), 'admin’s table shows it live')
 
 // 6. second device for the admin → conflict instead of silent overwrite
 const A2 = await phone('admin2')
@@ -173,13 +237,18 @@ check((await fsList('coaches/admin-uid/teams')).length === 1, 'admin data intact
 // 7. admin removes the coach (and their data)
 await A.evaluate(() => (location.hash = '#/league'))
 await click(A, 'admin')
-await click(A, 'Remove')
+await waitText(A, 'Members')
+for (const row of await A.$$('div.justify-between')) {
+  if ((await row.evaluate((x) => x.textContent)).startsWith('Max')) await (await row.$('button')).click()
+}
 await sleep(3000)
+const maxEntry = (await Promise.all((await fsList('participants')).map((id) => fsGet(`participants/${id}`)))).find((x) => x.fields.coach.stringValue === 'Max')
+check(!maxEntry.fields.uid, 'removing (with data) frees Max’s participant entry')
 check((await fsList('coaches/max-uid/teams')).length === 0 && (await fsList('coaches/max-uid/matches')).length === 0, 'removed coach’s data deleted')
 await B.evaluate(() => (location.hash = '#/league'))
 check(await waitText(B, 'Ask to join', 15000), 'removed coach loses access (live)')
 
-for (const [n, p] of [['admin', A], ['max', B], ['admin2', A2]]) {
+for (const [n, p] of [['admin', A], ['max', B], ['lena', C], ['admin2', A2]]) {
   const errs = p.errors.filter((e) => !/Failed to load resource|permission|Missing or insufficient/i.test(e))
   check(errs.length === 0, `${n}: no unexpected console errors ${errs.length ? JSON.stringify(errs).slice(0, 400) : ''}`)
 }

@@ -1,7 +1,7 @@
 /** League-wide results: pairing both coaches' records of a game, the table, head-to-head and leaderboards. */
 import type { LeagueRef, MatchEvent } from '../db'
 import type { LeagueSettings } from '../rules/sevens'
-import type { LeagueData, LeagueMatch, LeagueTeam } from './league'
+import type { LeagueData, LeagueMatch, LeagueTeam, Participant } from './league'
 import { computeStats, type PlayerStats } from './stats'
 
 export const teamKey = (r: LeagueRef) => `${r.uid}:${r.teamId}`
@@ -19,9 +19,13 @@ export interface LeagueGame {
   date: number
   /** team key of side a (whose record is the primary one) */
   a: string
-  /** team key of side b; null = guest outside the league */
+  /**
+   * side b: a team key in the app, `#<pid>` (a participant not in the app yet), or null: not counted
+   * (opponent not on the participant list, e.g. a friendly)
+   */
   b: string | null
-  guest?: string
+  /** side b's name/coach when it isn't a team in the app (from the participant list, else as typed) */
+  paper?: { name: string; coach: string }
   score: { a: number; b: number }
   cas: { a: number; b: number }
   /** one or both coaches' records */
@@ -30,61 +34,114 @@ export interface LeagueGame {
   mismatch?: string
 }
 
-/** Resolves which league team a record was played against: the picked ref, else a unique exact team-name match. */
-export function opponentKey(m: LeagueMatch, d: LeagueData, byName = nameIndex(d)): string | null {
-  const self = selfKey(m)
-  const ref = m.match.opponent.ref
-  if (ref) {
-    const k = teamKey(ref)
-    return k !== self && d.teams.some((t) => teamKey({ uid: t.uid, teamId: t.team.id }) === k) ? k : null
-  }
-  const k = byName.get(norm(m.match.opponent.name ?? ''))
-  return k && k !== self ? k : null
+/** Name key of an opponent (team name, else coach name): typed opponents are matched to the participant list by it. */
+export function paperKey(o: { name?: string; coach?: string }): string | null {
+  const n = norm(o.name ?? '')
+  if (n) return `~${n}`
+  const c = norm(o.coach ?? '')
+  return c ? `~coach:${c}` : null
 }
-function nameIndex(d: LeagueData) {
-  const idx = new Map<string, string | null>()
-  for (const t of d.teams) {
-    const n = norm(t.team.name)
-    idx.set(n, idx.has(n) ? null : teamKey({ uid: t.uid, teamId: t.team.id }))
+/** a participant who isn't in the app yet (own row, from the records of the coaches who played them) */
+export const isPaper = (k: string | null | undefined) => !!k && k.startsWith('#')
+
+/**
+ * The team a participant plays as: their team in the app once they joined (the one they picked, else the one with
+ * the entry's team name, else their only published team), otherwise none. `unsure`: joined, but several teams and
+ * none picked yet.
+ */
+export function participantTeam(d: LeagueData, p: Participant): { team?: LeagueTeam; unsure?: boolean } {
+  if (!p.uid) return {}
+  const ts = d.teams.filter((t) => t.uid === p.uid)
+  const t = ts.find((t) => t.team.leaguePid === p.id) ?? ts.find((t) => norm(t.team.name) === norm(p.team)) ?? (ts.length === 1 ? ts[0] : undefined)
+  return t ? { team: t } : { unsure: ts.length > 1 }
+}
+
+type Resolver = { byPid: Map<string, string>; byName: Map<string, string> }
+/** participant id → table key, and name key → table key (participant list first, then team names in the app) */
+export function resolver(d: LeagueData): Resolver {
+  const byPid = new Map<string, string>()
+  const names = new Map<string, string | null>()
+  const listed = new Map<string, string | null>()
+  // a name used twice is ambiguous: left out
+  const put = (m: Map<string, string | null>, pk: string | null, k: string) => pk && m.set(pk, m.has(pk) && m.get(pk) !== k ? null : k)
+  for (const t of d.teams) put(names, paperKey({ name: t.team.name }), teamKey({ uid: t.uid, teamId: t.team.id }))
+  for (const p of d.participants) {
+    const { team } = participantTeam(d, p)
+    const k = team ? teamKey({ uid: team.uid, teamId: team.team.id }) : `#${p.id}`
+    byPid.set(p.id, k)
+    put(listed, paperKey({ name: p.team }), k)
+    put(listed, paperKey({ coach: p.coach }), k)
+    if (team) put(listed, paperKey({ name: team.team.name }), k)
   }
-  return new Map([...idx].filter((e): e is [string, string] => e[1] != null))
+  const byName = new Map(names)
+  for (const [pk, k] of listed) byName.set(pk, k)
+  return { byPid, byName: new Map([...byName].filter((e): e is [string, string] => e[1] != null)) }
+}
+
+/**
+ * Which side b a record was played against: the picked team in the app (ref), else the picked participant (pid),
+ * else the participant (or team in the app) with that name. Null = not counted.
+ */
+export function opponentKey(m: LeagueMatch, d: LeagueData, r = resolver(d)): string | null {
+  const self = selfKey(m)
+  const o = m.match.opponent
+  const k =
+    (o.ref && d.teams.some((t) => teamKey({ uid: t.uid, teamId: t.team.id }) === teamKey(o.ref!)) ? teamKey(o.ref) : undefined) ??
+    (o.pid ? r.byPid.get(o.pid) : undefined) ??
+    r.byName.get(paperKey(o) ?? '') ??
+    // by coach name, when the typed team name isn't on the list
+    r.byName.get(paperKey({ coach: o.coach }) ?? '')
+  return k && k !== self ? k : null
 }
 
 /** Every finished game in the league, counted once. */
 export function leagueGames(d: LeagueData): LeagueGame[] {
-  const byName = nameIndex(d)
+  const res = resolver(d)
+  const pById = new Map(d.participants.map((p) => [`#${p.id}`, p]))
   const teamKeys = new Set(d.teams.map((t) => teamKey({ uid: t.uid, teamId: t.team.id })))
   const recs = d.matches
     .filter((m) => m.match?.status === 'done' && teamKeys.has(selfKey(m)))
-    .map((m) => ({ m, self: selfKey(m), opp: opponentKey(m, d, byName) }))
+    .map((m) => ({ m, self: selfKey(m), opp: opponentKey(m, d, res) }))
     .sort((x, y) => x.m.match.date - y.m.match.date)
-  const used = new Set<typeof recs[number]>()
+  // pair both coaches' records of a game: best candidates first (score agrees, then closest date), each record once
+  type Rec = (typeof recs)[number]
+  const agrees = (x: Rec, y: Rec) => x.m.match.score.us === y.m.match.score.them && x.m.match.score.them === y.m.match.score.us
+  const cands: { x: Rec; y: Rec; rank: number }[] = []
+  recs.forEach((x, i) => {
+    if (!x.opp || isPaper(x.opp)) return
+    for (const y of recs.slice(i + 1)) {
+      if (y.self !== x.opp || y.opp !== x.self) continue
+      const diff = Math.abs(y.m.match.date - x.m.match.date)
+      if (diff <= PAIR_WINDOW) cands.push({ x, y, rank: (agrees(x, y) ? 0 : PAIR_WINDOW + 1) + diff })
+    }
+  })
+  const partner = new Map<Rec, Rec>()
+  for (const c of cands.sort((p, q) => p.rank - q.rank)) {
+    if (partner.has(c.x) || partner.has(c.y)) continue
+    partner.set(c.x, c.y)
+    partner.set(c.y, c.x)
+  }
+  const used = new Set<Rec>()
   const games: LeagueGame[] = []
   for (const r of recs) {
     if (used.has(r)) continue
     used.add(r)
-    let other: typeof r | undefined
-    if (r.opp) {
-      let best = Infinity
-      for (const o of recs) {
-        if (used.has(o) || o.self !== r.opp || o.opp !== r.self) continue
-        const diff = Math.abs(o.m.match.date - r.m.match.date)
-        if (diff <= PAIR_WINDOW && diff < best) {
-          best = diff
-          other = o
-        }
-      }
-      if (other) used.add(other)
-    }
+    const other = partner.get(r)
+    if (other) used.add(other)
     // primary record: deterministic, so every phone shows the same table
     const [p, q] = other && other.self < r.self ? [other, r] : [r, other]
     const pm = p.m.match
+    const listed = p.opp ? pById.get(p.opp) : undefined
     const g: LeagueGame = {
       id: `${p.m.uid}:${pm.id}`,
       date: pm.date,
       a: p.self,
       b: p.opp,
-      guest: p.opp ? undefined : pm.opponent.name || 'Guest',
+      paper: listed
+        ? { name: listed.team || listed.coach, coach: listed.coach }
+        : p.opp
+          ? undefined
+          : { name: pm.opponent.name || 'Opponent', coach: pm.opponent.coach ?? '' },
       score: { a: pm.score.us, b: pm.score.them },
       // each side's casualties from its own coach's log when there is one
       cas: { a: casFor(p.m.events), b: q ? casFor(q.m.events) : casAgainst(p.m.events) },
@@ -102,9 +159,24 @@ export function leagueGames(d: LeagueData): LeagueGame[] {
   return games.sort((x, y) => y.date - x.date)
 }
 
+export interface PaperTeam { key: string; participant: Participant; name: string; coach: string; games: LeagueGame[] }
+/** Participants not in the app yet (or not linked to a team yet), with the games logged against them. */
+export function paperTeams(d: LeagueData, games: LeagueGame[]): PaperTeam[] {
+  const r = resolver(d)
+  return d.participants
+    .filter((p) => isPaper(r.byPid.get(p.id)))
+    .map((p) => {
+      const key = `#${p.id}`
+      return { key, participant: p, name: p.team || p.coach, coach: p.coach, games: games.filter((g) => g.b === key) }
+    })
+}
+
 export interface TableRow {
   key: string
-  team: LeagueTeam
+  /** the team in the app; absent for a participant not in the app yet */
+  team?: LeagueTeam
+  name: string
+  coach: string
   p: number
   w: number
   d: number
@@ -116,13 +188,18 @@ export interface TableRow {
   pts: number
 }
 
-/** League table: only games between two league teams count (guests don't). Win 3, draw 1, loss 0. */
+/**
+ * League table. Win 3, draw 1, loss 0. Every participant has a row from the start; one not in the app yet gets
+ * their results from the records of the coaches who played them.
+ */
 export function leagueTable(d: LeagueData, games: LeagueGame[]): TableRow[] {
   const rows = new Map<string, TableRow>()
+  const blank = { p: 0, w: 0, d: 0, l: 0, tdFor: 0, tdAgainst: 0, casFor: 0, casAgainst: 0, pts: 0 }
   for (const t of d.teams) {
     const key = teamKey({ uid: t.uid, teamId: t.team.id })
-    rows.set(key, { key, team: t, p: 0, w: 0, d: 0, l: 0, tdFor: 0, tdAgainst: 0, casFor: 0, casAgainst: 0, pts: 0 })
+    rows.set(key, { key, team: t, name: t.team.name, coach: t.coach, ...blank })
   }
+  for (const pt of paperTeams(d, games)) rows.set(pt.key, { key: pt.key, name: pt.name, coach: pt.coach, ...blank })
   const add = (key: string, tf: number, ta: number, cf: number, ca: number) => {
     const r = rows.get(key)
     if (!r) return
@@ -147,7 +224,7 @@ export function leagueTable(d: LeagueData, games: LeagueGame[]): TableRow[] {
       y.casFor - y.casAgainst - (x.casFor - x.casAgainst) ||
       y.tdFor - x.tdFor ||
       x.p - y.p ||
-      x.team.team.name.localeCompare(y.team.team.name),
+      x.name.localeCompare(y.name),
   )
 }
 
@@ -156,7 +233,7 @@ export interface H2H { a: string; b: string; w: number; d: number; l: number; td
 export function headToHead(games: LeagueGame[]): H2H[] {
   const map = new Map<string, H2H>()
   for (const g of games) {
-    if (!g.b) continue
+    if (!g.b || isPaper(g.b)) continue
     let ua = g.a.split(':')[0]
     let ub = g.b.split(':')[0]
     if (ua === ub) continue

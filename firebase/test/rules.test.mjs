@@ -33,6 +33,7 @@ beforeEach(async () => {
       await setDoc(doc(db, 'coaches', uid, 'matches', '1'), { match: { id: 1 }, events: [], hash: 'x', updatedAt: 1 })
     }
     await setDoc(doc(db, 'requests', 'carol'), { coach: 'Carol', requestedAt: 1 })
+    await setDoc(doc(db, 'participants', 'p1'), { coach: 'Lena', team: "Grimgut's Gobbos", rosterId: 'goblin', createdAt: 1 })
   })
 })
 
@@ -86,6 +87,12 @@ describe('join requests', () => {
     await assertFails(setDoc(ref, { coach: 'Dave', requestedAt: 123 }))
     await assertFails(setDoc(ref, { coach: 'Dave', requestedAt: serverTimestamp(), admin: true }))
   })
+  test('a request may name a participant-list entry', async () => {
+    const ref = doc(as('dave'), 'requests', 'dave')
+    await assertSucceeds(setDoc(ref, { coach: 'Lena', participant: 'p1', requestedAt: serverTimestamp() }))
+    await assertFails(setDoc(ref, { coach: 'Lena', participant: 7, requestedAt: serverTimestamp() }))
+    await assertFails(setDoc(ref, { coach: 'Lena', participant: 'x'.repeat(41), requestedAt: serverTimestamp() }))
+  })
   test('members cannot list requests; admin can', async () => {
     await assertFails(getDocs(collection(as('alice'), 'requests')))
     await assertSucceeds(getDocs(collection(as(ADMIN), 'requests')))
@@ -120,6 +127,41 @@ describe('admin', () => {
   })
   test('member doc must be well-formed', async () => {
     await assertFails(setDoc(doc(as(ADMIN), 'members', 'zed'), { coach: 'Zed', joinedAt: 1, admin: true }))
+  })
+})
+
+describe('participant list', () => {
+  test('signed-in users (also non-members) can read it; signed out cannot', async () => {
+    await assertSucceeds(getDocs(collection(as('mallory'), 'participants')))
+    await assertSucceeds(getDocs(collection(as('alice'), 'participants')))
+    await assertFails(getDocs(collection(as(null), 'participants')))
+  })
+  test('only the admin writes it', async () => {
+    for (const uid of ['alice', 'mallory']) {
+      const db = as(uid)
+      await assertFails(setDoc(doc(db, 'participants', 'p2'), { coach: 'X', team: 'Y', createdAt: 1 }))
+      await assertFails(updateDoc(doc(db, 'participants', 'p1'), { uid }))
+      await assertFails(deleteDoc(doc(db, 'participants', 'p1')))
+    }
+    const db = as(ADMIN)
+    await assertSucceeds(setDoc(doc(db, 'participants', 'p2'), { coach: 'Olaf', team: 'Nordmänner', rosterId: '', createdAt: serverTimestamp() }))
+    await assertSucceeds(updateDoc(doc(db, 'participants', 'p1'), { uid: 'dave' }))
+    await assertSucceeds(deleteDoc(doc(db, 'participants', 'p2')))
+  })
+  test('approving links the coach to their entry in the same batch', async () => {
+    const db = as(ADMIN)
+    const b = writeBatch(db)
+    b.set(doc(db, 'members', 'carol'), { coach: 'Lena', joinedAt: serverTimestamp() })
+    b.update(doc(db, 'participants', 'p1'), { uid: 'carol' })
+    b.delete(doc(db, 'requests', 'carol'))
+    await assertSucceeds(b.commit())
+  })
+  test('entries must be well-formed', async () => {
+    const db = as(ADMIN)
+    await assertFails(setDoc(doc(db, 'participants', 'p3'), { coach: '', team: 'Y' }))
+    await assertFails(setDoc(doc(db, 'participants', 'p3'), { coach: 'X', team: 'y'.repeat(61) }))
+    await assertFails(setDoc(doc(db, 'participants', 'p3'), { coach: 'X', team: 'Y', admin: true }))
+    await assertFails(setDoc(doc(db, 'participants', 'p3'), { coach: 'X', team: 'Y', uid: 5 }))
   })
 })
 
