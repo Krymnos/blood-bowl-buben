@@ -82,7 +82,7 @@ export default function Settings() {
       <H2>Other</H2>
       <Card>
         <label className="flex items-center gap-2 text-sm">
-          <span className="flex-1">Re-roll cost after the draft (k)</span>
+          <span className="flex-1">Extra re-roll price after the draft (k; team value stays 100k)</span>
           <NumberInput className="!w-20 !py-1.5 text-center" value={s.rerollCostLeague / 1000} onChange={(v) => save({ ...s, rerollCostLeague: v * 1000 })} />
         </label>
         <Button variant="ghost" className="mt-2 w-full text-xs" onClick={() => confirm('Reset all house rules to the league defaults (Verfassung Vol. 3)?') && save(DEFAULT_SETTINGS)}>

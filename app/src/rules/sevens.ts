@@ -225,7 +225,7 @@ export const DEFAULT_SETTINGS: LeagueSettings = {
     characteristic: [14, 16, 20, 24, 28, 38],
   },
   valueIncrease: { randomPrimary: 10_000, primary: 20_000, secondary: 40_000, elite: 10_000, ma: 20_000, st: 60_000, ag: 30_000, pa: 20_000, av: 10_000 },
-  rerollCostLeague: 100_000,
+  rerollCostLeague: 200_000,
   winsPoints: 3,
   drawPoints: 1,
 }

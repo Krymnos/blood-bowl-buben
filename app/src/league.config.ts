@@ -13,9 +13,9 @@ export const firebaseConfig = {
 
 /**
  * The league admin's Firebase Auth uid. Must match adminUid() in firebase/firestore.rules.
- * Empty = nobody is admin yet (the League tab shows your uid after you sign in).
+ * Empty = nobody is admin. To hand the league over: change both places, deploy the rules, push the app.
  */
-const LEAGUE_ADMIN_UID = ''
+const LEAGUE_ADMIN_UID = '7XTAKf3B7qVjzBVNB3G26KVXv313'
 export const ADMIN_UID: string = (import.meta.env.DEV && import.meta.env.VITE_EMULATOR_ADMIN_UID) || LEAGUE_ADMIN_UID
 
 /** File the admin's phone also writes into its private GitHub backup repository. */

@@ -100,7 +100,8 @@ coaches/{uid}/matches/{matchId}  { match, events[], hash, updatedAt }     owner 
 - [x] Firebase project set up (you)
 - [x] Implementation, steps 1–6 (2026-11-17): rules + 23 emulator tests; sign-in, join request, approval; push sync with deletes, conflicts and status; League view; opponent picker with pairing and mismatch flags; table, leaderboards, head-to-head; admin league backup
 - [x] End-to-end test against the emulators (admin + coach in two browser profiles): `cd firebase && npm run e2e`
-- [ ] Rules deployed, admin id filled in (you + me)
+- [x] Admin id filled in (2026-11-17)
+- [ ] Rules deployed (you)
 - [ ] Two-phone test, then roll out
 
 ## Next steps

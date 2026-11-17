@@ -6,13 +6,14 @@
 |---|---|
 | Ruleset base | Verfassung Vol. 3 → Sevens (Spike! 22) → Third Season Edition |
 | Rosters | **bbroster.com Sevens rosters are the source of truth** (tiers, leagues, skill categories, NAF Slann). Position names and skill wording stay as in the rulebook data. |
-| Draft | 600k, 7–11 players, 0–4 positionals, re-rolls 100k, Leader forbidden. **Left-over budget is lost: the treasury is 0 for the first game** ("Finish draft" button, or automatic at the first match). |
+| Draft | 600k, 7–11 players, 0–4 positionals, re-rolls 100k, Leader forbidden. **After the draft an extra re-roll costs 200k (editable), but it still counts 100k in team value.** **Left-over budget is lost: the treasury is 0 for the first game** ("Finish draft" button, or automatic at the first match). |
 | Staff | 0-3 Assistant Coaches 20k, 0-6 Cheerleaders 20k, 0-1 Apothecary 80k, 0-1 Goblin lawyer 30k (keeps one scouted player per season). 1 free Dedicated Fan, not in team value. |
 | Star Player | One per team roster (name + fee entered by hand; details are in a separate league document). Hired in pre-match step 0 and paid from the treasury; each Werbetrommel refunds 50k of it. |
 | Inducements | Verfassung list, **Petty Cash only** (opponent TV − our TV), no treasury top-up. |
 | Pre-match | 0 Star Player, 1 Fan Factor (D3 + Dedicated Fans), 2 Weather (2D6), 3 Journeymen (Lineman + Loner 5+, free), 4 Inducements, 5 Kick/receive roll-off |
 | Progression | SPP (11s system). Costs, SPP awards and values editable in Settings; defaults = Verfassung Ref. C. |
 | SPP | Completion 1, superb TTM throw 1, TTM landing 1, Interception 2, Casualty 2, **Casualty on a Star Player 4 (house rule)**, TD 3, MVP 4. Prayers that change SPP (Perfect Passing, Fan Interaction, Necessary Violence, Fouling Frenzy) apply automatically for that match. |
+| Random primary | Two ways, same SPP cost: (a) one random skill, +10k value; (b) roll two skills and pick one, +20k value (same as a chosen primary). |
 | Player value | Random primary +10k, primary +20k, secondary +40k, elite (Block, Dodge, Guard, Mighty Blow) +10k, AV +10k, MA/PA +20k, AG +30k, ST +60k |
 | Characteristic | D16 table (Ref. C); may take a Primary/Secondary skill instead |
 | Scouting | After spending SPP: D6 ≤ number of advancements → player leaves, team gets his position's purchase price |

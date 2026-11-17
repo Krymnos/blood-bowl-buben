@@ -177,8 +177,8 @@ describe('members', () => {
   })
 })
 
-describe('placeholder admin', () => {
-  test('with an empty adminUid nobody is admin', async () => {
+describe('deployed rules', () => {
+  test('only the configured admin uid is admin', async () => {
     const env2 = await initializeTestEnvironment({ projectId: 'demo-buben-2', firestore: { rules } })
     try {
       await assertFails(getDocs(collection(env2.authenticatedContext('anyone').firestore(), 'requests')))

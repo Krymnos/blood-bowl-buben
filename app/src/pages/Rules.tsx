@@ -169,7 +169,7 @@ export default function Rules() {
           <div>
             <Sub>Player value</Sub>
             <KV rows={[
-              ['Random primary skill', gp(s.valueIncrease.randomPrimary)], ['Primary skill', gp(s.valueIncrease.primary)], ['Secondary skill', gp(s.valueIncrease.secondary)],
+              ['Random primary skill', gp(s.valueIncrease.randomPrimary)], ['Random primary, pick 1 of 2', gp(s.valueIncrease.primary)], ['Primary skill', gp(s.valueIncrease.primary)], ['Secondary skill', gp(s.valueIncrease.secondary)],
               ['Elite skill extra', gp(s.valueIncrease.elite)], ['+1 AV', gp(s.valueIncrease.av)], ['+1 MA / PA', gp(s.valueIncrease.ma)], ['+1 AG', gp(s.valueIncrease.ag)], ['+1 ST', gp(s.valueIncrease.st)],
             ].map(([k, v]) => [k, `+${v}`])} />
             <div className="mt-1 text-[11px] text-white/50">Elite: Block, Dodge, Guard, Mighty Blow.</div>
@@ -215,7 +215,7 @@ export default function Rules() {
           Each coach builds a team worth at most {gp(SEVENS.draftBudget)} under the normal Sevens rules — teams start with a team value of at most {gp(SEVENS.draftBudget)}. Every team starts with one Dedicated Fan that doesn't count towards team value. You also pick one Star Player for your roster (see the separate Star Player document).
         </div>
         <div className="grid grid-cols-4 gap-1.5 text-center">
-          {[['7-11', 'players'], ['0-4', 'positionals (rest Linemen)'], [gp(SEVENS.rerollCost), 're-roll'], ['✕ Leader', 'forbidden']].map(([a, b]) => (
+          {[['7-11', 'players'], ['0-4', 'positionals (rest Linemen)'], [gp(SEVENS.rerollCost), 're-roll (draft)'], ['✕ Leader', 'forbidden']].map(([a, b]) => (
             <div key={b} className="rounded-xl bg-turf/40 px-1 py-2">
               <div className="font-black text-gold">{a}</div>
               <div className="text-[10px] leading-tight text-white/70">{b}</div>

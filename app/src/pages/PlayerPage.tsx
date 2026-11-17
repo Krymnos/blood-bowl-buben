@@ -204,13 +204,14 @@ function CostBox({ label, cost, spp }: { label: string; cost: number; spp: numbe
   )
 }
 
-type AdvKind = 'randomPrimary' | 'chosenPrimary' | 'chosenSecondary' | 'characteristic'
+type AdvKind = 'randomPrimary' | 'randomPick' | 'chosenPrimary' | 'chosenSecondary' | 'characteristic'
 const FORBIDDEN = SEVENS.forbiddenSkills as readonly string[]
 
 function AdvanceSheet({ open, onClose, p, team, settings, spp }: { open: boolean; onClose: () => void; p: Player; team: Team; settings: LeagueSettings; spp: number }) {
   const [kind, setKind] = useState<AdvKind | null>(null)
   const [cat, setCat] = useState<SkillCategory | null>(null)
   const [skill, setSkill] = useState<string>('')
+  const [picks, setPicks] = useState<string[]>([])
   const [d16, setD16] = useState<number | undefined>()
   const [stat, setStat] = useState<Stat | 'primary' | 'secondary' | null>(null)
   const [scout, setScout] = useState<{ advId: string; count: number; roll?: number } | null>(null)
@@ -218,9 +219,11 @@ function AdvanceSheet({ open, onClose, p, team, settings, spp }: { open: boolean
   const owned = new Set(profile(p, team.rosterId).skills.map((s) => s.split(' (')[0].toLowerCase()))
   const blocked = (name: string) => owned.has(name.toLowerCase()) || FORBIDDEN.includes(name)
   const n = p.advancements.length
-  const cost = kind ? settings.advCost[kind][n] : 0
+  const costOf = (k: AdvKind) => settings.advCost[k === 'randomPick' ? 'randomPrimary' : k][n]
+  const isRandom = kind === 'randomPrimary' || kind === 'randomPick'
+  const cost = kind ? costOf(kind) : 0
   const reset = () => {
-    setKind(null); setCat(null); setSkill(''); setD16(undefined); setStat(null); setScout(null)
+    setKind(null); setCat(null); setSkill(''); setPicks([]); setD16(undefined); setStat(null); setScout(null)
   }
   const close = () => { reset(); onClose() }
   const v = settings.valueIncrease
@@ -234,9 +237,23 @@ function AdvanceSheet({ open, onClose, p, team, settings, spp }: { open: boolean
     setSkill(s.name)
   }
 
+  /** Random primary, pick 1 of 2: roll two different skills and choose between them. */
+  const rollTwo = (c: SkillCategory) => {
+    const list = skillsInCategory(c)
+    const free = list.filter((s) => !blocked(s.name))
+    if (!free.length) return
+    const out: string[] = []
+    while (out.length < Math.min(2, free.length)) {
+      const s = list[(d(6) > 3 ? 6 : 0) + d(6) - 1]
+      if (!blocked(s.name) && !out.includes(s.name)) out.push(s.name)
+    }
+    setPicks(out)
+    setSkill('')
+  }
+
   const save = async () => {
     let adv: Advancement
-    const base = { id: uid(), spp: cost, at: Date.now(), random: kind === 'randomPrimary' }
+    const base = { id: uid(), spp: cost, at: Date.now(), random: isRandom }
     const elite = (name: string) => (findSkill(name)?.elite ? v.elite : 0)
     if (kind === 'characteristic' && (stat === 'primary' || stat === 'secondary')) {
       adv = { ...base, kind: stat, skill, value: (stat === 'primary' ? v.primary : v.secondary) + elite(skill) }
@@ -244,6 +261,8 @@ function AdvanceSheet({ open, onClose, p, team, settings, spp }: { open: boolean
       adv = { ...base, kind: 'stat', stat: stat as Stat, value: v[stat as Stat] }
     } else if (kind === 'randomPrimary') {
       adv = { ...base, kind: 'primary', skill, value: v.randomPrimary + elite(skill) }
+    } else if (kind === 'randomPick') {
+      adv = { ...base, kind: 'primary', skill, value: v.primary + elite(skill) }
     } else {
       const isPrimary = kind === 'chosenPrimary'
       adv = { ...base, kind: isPrimary ? 'primary' : 'secondary', skill, value: (isPrimary ? v.primary : v.secondary) + elite(skill) }
@@ -318,10 +337,10 @@ function AdvanceSheet({ open, onClose, p, team, settings, spp }: { open: boolean
     <Sheet open={open} onClose={close} title="Advance player">
       {!kind && (
         <div className="space-y-2">
-          {(['randomPrimary', 'chosenPrimary', 'chosenSecondary', 'characteristic'] as AdvKind[]).map((k) => {
-            const c = settings.advCost[k][n]
-            const label = { randomPrimary: 'Random Primary skill', chosenPrimary: 'Chosen Primary skill', chosenSecondary: 'Chosen Secondary skill', characteristic: 'Characteristic improvement (D16)' }[k]
-            const val = { randomPrimary: v.randomPrimary, chosenPrimary: v.primary, chosenSecondary: v.secondary, characteristic: 0 }[k]
+          {(['randomPrimary', 'randomPick', 'chosenPrimary', 'chosenSecondary', 'characteristic'] as AdvKind[]).map((k) => {
+            const c = costOf(k)
+            const label = { randomPrimary: 'Random Primary skill', randomPick: 'Random Primary: pick 1 of 2', chosenPrimary: 'Chosen Primary skill', chosenSecondary: 'Chosen Secondary skill', characteristic: 'Characteristic improvement (D16)' }[k]
+            const val = { randomPrimary: v.randomPrimary, randomPick: v.primary, chosenPrimary: v.primary, chosenSecondary: v.secondary, characteristic: 0 }[k]
             return (
               <button key={k} onClick={() => setKind(k)} className="flex w-full justify-between rounded-xl bg-white/5 p-3 text-left active:bg-white/10">
                 <span>
@@ -371,13 +390,29 @@ function AdvanceSheet({ open, onClose, p, team, settings, spp }: { open: boolean
               🎲 Roll on the {CATEGORY_NAMES[cat]} table (D6 + D6)
             </Button>
           )}
+          {cat && kind === 'randomPick' && (
+            <>
+              <Button variant="soft" className="w-full" onClick={() => rollTwo(cat)}>
+                🎲🎲 Roll two skills on the {CATEGORY_NAMES[cat]} table
+              </Button>
+              {picks.length > 0 && (
+                <div className="flex gap-2">
+                  {picks.map((n) => (
+                    <button key={n} onClick={() => setSkill(n)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${skill === n ? 'bg-turf' : 'bg-white/10'}`}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
           {cat && (
-            <Field label={kind === 'randomPrimary' ? 'Result (or select what you rolled)' : 'Skill'}>
+            <Field label={isRandom ? 'Result (or select what you rolled)' : 'Skill'}>
               <select className={inputCls} value={skill} onChange={(e) => setSkill(e.target.value)}>
                 <option value="">Choose…</option>
                 {skillsInCategory(cat).map((s, i) => (
                   <option key={s.name} value={s.name} disabled={blocked(s.name)}>
-                    {kind === 'randomPrimary' ? `${i < 6 ? '1-3' : '4-6'}/${(i % 6) + 1}: ` : ''}
+                    {isRandom ? `${i < 6 ? '1-3' : '4-6'}/${(i % 6) + 1}: ` : ''}
                     {s.name}
                     {s.elite ? ' ◆' : ''}
                     {FORBIDDEN.includes(s.name) ? ' (forbidden)' : ''}
