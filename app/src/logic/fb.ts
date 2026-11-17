@@ -126,6 +126,57 @@ export async function putParticipant(p: { id?: string; coach: string; team: stri
 export const deleteParticipant = (id: string) => deleteDoc(doc(fs, 'participants', id))
 export const linkParticipant = (id: string, uid: string | null) => updateDoc(doc(fs, 'participants', id), { uid: uid ?? deleteField() })
 
+// ---------- results the admin records (members read) ----------
+
+/** A result between two participant-list entries: from the old league sheet, or entered by the admin. */
+export interface LeagueResult {
+  id: string
+  /** participant ids */
+  a: string
+  b: string
+  score: { a: number; b: number }
+  cas?: { a: number; b: number }
+  date: number
+  /** 'YYYY-MM' for sheet results: only the month is known */
+  month?: string
+  source: 'sheet' | 'admin'
+}
+export function watchResults(cb: (rows: LeagueResult[]) => void, onError: (e: Error) => void) {
+  return onSnapshot(
+    collection(fs, 'results'),
+    (s) =>
+      cb(s.docs.map((d) => {
+        const x = d.data()
+        return {
+          id: d.id, a: x.a, b: x.b, score: { a: x.sa, b: x.sb }, date: x.date, month: x.month || undefined, source: x.source,
+          ...(x.ca != null || x.cb != null ? { cas: { a: x.ca ?? 0, b: x.cb ?? 0 } } : {}),
+        }
+      })),
+    onError,
+  )
+}
+const resultDoc = (r: Omit<LeagueResult, 'id'>) => ({
+  a: r.a, b: r.b, sa: r.score.a, sb: r.score.b, date: r.date, source: r.source,
+  ...(r.cas ? { ca: r.cas.a, cb: r.cas.b } : {}),
+  ...(r.month ? { month: r.month } : {}),
+  createdAt: serverTimestamp(),
+})
+export async function putResult(r: Omit<LeagueResult, 'id'> & { id?: string }) {
+  await setDoc(r.id ? doc(fs, 'results', r.id) : doc(collection(fs, 'results')), resultDoc(r))
+}
+export const deleteResult = (id: string) => deleteDoc(doc(fs, 'results', id))
+/** A new participant id (so an import can reference entries before they are written). */
+export const newParticipantId = () => doc(collection(fs, 'participants')).id
+/** League-sheet import in one go: new participants, results to write (by id) and results to delete. */
+export async function importSheet(participants: { id: string; coach: string; uid?: string }[], results: LeagueResult[], remove: string[]) {
+  await commitInChunks([
+    ...participants.map((p) => (b: ReturnType<typeof writeBatch>) =>
+      b.set(doc(fs, 'participants', p.id), { coach: p.coach, team: '', rosterId: '', ...(p.uid ? { uid: p.uid } : {}), createdAt: serverTimestamp() })),
+    ...results.map(({ id, ...r }) => (b: ReturnType<typeof writeBatch>) => b.set(doc(fs, 'results', id), resultDoc(r))),
+    ...remove.map((id) => (b: ReturnType<typeof writeBatch>) => b.delete(doc(fs, 'results', id))),
+  ])
+}
+
 // ---------- league data (read) ----------
 
 export interface RawLeague {

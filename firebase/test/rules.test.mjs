@@ -165,6 +165,33 @@ describe('participant list', () => {
   })
 })
 
+describe('league results (admin-recorded)', () => {
+  const res = (x = {}) => ({ a: 'p1', b: 'p2', sa: 2, sb: 1, date: 1763000000000, month: '2026-11', source: 'sheet', createdAt: serverTimestamp(), ...x })
+  test('members read them; strangers and signed-out users do not', async () => {
+    await assertSucceeds(getDocs(collection(as('alice'), 'results')))
+    await assertFails(getDocs(collection(as('mallory'), 'results')))
+    await assertFails(getDocs(collection(as(null), 'results')))
+  })
+  test('only the admin writes them', async () => {
+    await assertFails(setDoc(doc(as('alice'), 'results', 'r1'), res()))
+    const db = as(ADMIN)
+    await assertSucceeds(setDoc(doc(db, 'results', 'r1'), res()))
+    await assertSucceeds(setDoc(doc(db, 'results', 'r2'), { a: 'p1', b: 'p2', sa: 0, sb: 0, ca: 1, cb: 0, date: 1763000000000, source: 'admin', createdAt: serverTimestamp() }))
+    await assertFails(updateDoc(doc(as('alice'), 'results', 'r1'), { sa: 9 }))
+    await assertFails(deleteDoc(doc(as('alice'), 'results', 'r1')))
+    await assertSucceeds(deleteDoc(doc(db, 'results', 'r1')))
+  })
+  test('results must be well-formed', async () => {
+    const db = as(ADMIN)
+    await assertFails(setDoc(doc(db, 'results', 'r3'), res({ b: 'p1' })))
+    await assertFails(setDoc(doc(db, 'results', 'r3'), res({ sa: -1 })))
+    await assertFails(setDoc(doc(db, 'results', 'r3'), res({ sa: 1.5 })))
+    await assertFails(setDoc(doc(db, 'results', 'r3'), res({ month: 'Nov' })))
+    await assertFails(setDoc(doc(db, 'results', 'r3'), res({ source: 'coach' })))
+    await assertFails(setDoc(doc(db, 'results', 'r3'), res({ extra: true })))
+  })
+})
+
 describe('members', () => {
   test('can read everything in the league', async () => {
     const db = as('alice')

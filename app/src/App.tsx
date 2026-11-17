@@ -18,6 +18,7 @@ import Rules from './pages/Rules'
 const League = lazy(() => import('./pages/League'))
 const LeagueTeamPage = lazy(() => import('./pages/League').then((m) => ({ default: m.LeagueTeamPage })))
 const LeaguePlayerPage = lazy(() => import('./pages/League').then((m) => ({ default: m.LeaguePlayerPage })))
+const PastGame = lazy(() => import('./pages/PastGame'))
 
 function MatchRouter() {
   const id = Number(useParams().mid)
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/team/new" element={<NewTeam />} />
         <Route path="/team/:id" element={<TeamPage />} />
         <Route path="/team/:id/player/:pid" element={<PlayerPage />} />
+        <Route path="/team/:id/past" element={<PastGame />} />
         <Route path="/match/:mid" element={<MatchRouter />} />
         <Route path="/match/:mid/log" element={<MatchLogEditor />} />
         <Route path="/rules" element={<Rules />} />

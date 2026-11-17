@@ -54,6 +54,25 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Results the admin records (from the old league sheet, or games where neither coach uses the app):
+    // between two participant-list entries. A coach's own record of the same game replaces it.
+    match /results/{rid} {
+      allow read: if isMember();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['a', 'b', 'sa', 'sb', 'ca', 'cb', 'date', 'month', 'source', 'createdAt'])
+        && request.resource.data.a is string && request.resource.data.a.size() > 0 && request.resource.data.a.size() <= 40
+        && request.resource.data.b is string && request.resource.data.b.size() > 0 && request.resource.data.b.size() <= 40
+        && request.resource.data.a != request.resource.data.b
+        && request.resource.data.sa is int && request.resource.data.sa >= 0 && request.resource.data.sa <= 99
+        && request.resource.data.sb is int && request.resource.data.sb >= 0 && request.resource.data.sb <= 99
+        && (!('ca' in request.resource.data) || (request.resource.data.ca is int && request.resource.data.ca >= 0 && request.resource.data.ca <= 99))
+        && (!('cb' in request.resource.data) || (request.resource.data.cb is int && request.resource.data.cb >= 0 && request.resource.data.cb <= 99))
+        && request.resource.data.date is int
+        && (!('month' in request.resource.data) || (request.resource.data.month is string && request.resource.data.month.matches('^[0-9]{4}-[0-9]{2}$')))
+        && request.resource.data.source in ['sheet', 'admin'];
+      allow delete: if isAdmin();
+    }
+
     // Each coach's published data. Owner writes (while a member), members read, admin may clean up.
     match /coaches/{uid} {
       allow read: if isMember();

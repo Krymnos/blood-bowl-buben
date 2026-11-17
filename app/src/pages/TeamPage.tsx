@@ -126,6 +126,9 @@ export default function TeamPage() {
             🏈 New match
           </Button>
           {matches.some((m) => m.status !== 'done') && <div className="text-center text-xs text-white/50">Finish the game in progress first.</div>}
+          <Button variant="soft" className="w-full" onClick={() => nav(`/team/${team.id}/past`)}>
+            📋 Log a past game
+          </Button>
           {matches.length === 0 && <Empty>No games played yet.</Empty>}
           {[...matches]
             .sort((a, b) => b.date - a.date)

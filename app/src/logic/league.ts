@@ -7,9 +7,9 @@ import { useSyncExternalStore } from 'react'
 import { db, type Match, type MatchEvent, type Player, type Team } from '../db'
 import { ADMIN_UID, LEAGUE_BACKUP_PATH } from '../league.config'
 import { hasCloud, hashOf, onBackup, putFile } from './cloud'
-import type { FbUser, Op, Participant, RawLeague, RequestRow } from './fb'
+import type { FbUser, LeagueResult, Op, Participant, RawLeague, RequestRow } from './fb'
 
-export type { Participant }
+export type { LeagueResult, Participant }
 
 export type Membership = 'unknown' | 'none' | 'requested' | 'member'
 
@@ -19,6 +19,8 @@ export interface LeagueData {
   members: { uid: string; coach: string; joinedAt?: number }[]
   /** the league's participant list (admin-made): every coach in the league, in the app or not */
   participants: Participant[]
+  /** results the admin recorded (old league sheet, games where neither coach uses the app) */
+  results: LeagueResult[]
   coachName: Record<string, string>
   teams: LeagueTeam[]
   matches: LeagueMatch[]
@@ -187,9 +189,18 @@ export const saveParticipant = async (p: { id?: string; coach: string; team: str
 export const deleteParticipant = async (id: string) => (await fb()).deleteParticipant(id)
 export const linkParticipant = async (id: string, uid: string | null) => (await fb()).linkParticipant(id, uid)
 
+// ---------- recorded results (admin) ----------
+
+export const saveResult = async (r: Omit<LeagueResult, 'id'> & { id?: string }) => (await fb()).putResult(r)
+export const deleteResult = async (id: string) => (await fb()).deleteResult(id)
+export const newParticipantId = async () => (await fb()).newParticipantId()
+export const importSheet = async (...a: Parameters<typeof import('./fb')['importSheet']>) => (await fb()).importSheet(...a)
+
 // ---------- reading the league ----------
 
 let stopLeague: (() => void) | undefined
+let stopResults: (() => void) | undefined
+let results: LeagueResult[] = []
 let wanted = false
 /** Live listeners on the whole league. Kept for the session once started (re-listening costs reads). */
 export function startData() {
@@ -200,6 +211,14 @@ function openData() {
   if (stopLeague || state.membership !== 'member') return
   void fb().then((api) => {
     if (stopLeague || state.membership !== 'member') return
+    // separate listener: a failure here (e.g. rules not deployed yet) mustn't take the whole league down
+    stopResults = api.watchResults(
+      (rows) => {
+        results = rows
+        if (state.data) set({ data: { ...state.data, results } })
+      },
+      () => {},
+    )
     stopLeague = api.watchLeague(
       (raw) => {
         set({ data: toLeague(raw), dataError: undefined })
@@ -214,7 +233,9 @@ function openData() {
 }
 function stopData() {
   stopLeague?.()
-  stopLeague = undefined
+  stopResults?.()
+  stopLeague = stopResults = undefined
+  results = []
 }
 function toLeague(raw: RawLeague): LeagueData {
   const coachName: Record<string, string> = {}
@@ -223,6 +244,7 @@ function toLeague(raw: RawLeague): LeagueData {
   return {
     members: raw.members,
     participants: state.participants ?? [],
+    results,
     coachName,
     teams: raw.teams.map((t) => ({ uid: t.uid, coach: coachName[t.uid] ?? '?', team: t.data.team, players: t.data.players ?? [], updatedAt: t.updatedAt })),
     matches: raw.matches.map((m) => ({ uid: m.uid, match: m.data.match, events: m.data.events ?? [], updatedAt: m.updatedAt })),
@@ -333,6 +355,7 @@ export function buildLeagueBackup(d: LeagueData) {
     exportedAt: new Date().toISOString(),
     members: d.members,
     participants: d.participants,
+    results: d.results,
     teams: d.teams.map((t) => ({ uid: t.uid, coach: t.coach, team: t.team, players: t.players })),
     matches: d.matches.map((m) => ({ uid: m.uid, match: m.match, events: m.events })),
   }

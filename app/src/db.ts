@@ -95,6 +95,10 @@ export interface Match {
    * (also for coaches not in the app yet). Typed opponents without either are matched to the list by team name.
    */
   opponent: { name: string; coach: string; rosterId: string; ctv: number; ref?: LeagueRef; pid?: string }
+  /** League: the admin's recorded result (from the old league sheet) this game is; it replaces that result */
+  resultId?: string
+  /** logged afterwards with "Log a past game" (no pre-/post-game sequence: treasury and fans weren't touched) */
+  pastGame?: boolean
   ourCtv: number
   /** players eligible to play this game (snapshot at setup) */
   played: number[]

@@ -37,6 +37,7 @@ Each coach logs in with their own account. Nobody shares a token, and nobody can
 ```
 members/{uid}                    { coach, joinedAt }                      admin writes
 participants/{pid}               { coach, team, rosterId, uid?, createdAt } admin writes, signed-in users read
+results/{rid}                    { a, b, sa, sb, ca?, cb?, date, month?, source } admin writes, members read
 requests/{uid}                   { coach, participant?, requestedAt }     the user writes their own
 coaches/{uid}                    { coach, device, updatedAt }             owner writes
 coaches/{uid}/teams/{teamId}     { team, players[], hash, updatedAt }     owner writes
@@ -55,9 +56,10 @@ coaches/{uid}/matches/{matchId}  { match, events[], hash, updatedAt }     owner 
 - `coaches/{uid}/**`: write only if `request.auth.uid == uid` and the user is a member.
 - `requests/{uid}`: create/update only by that uid; read/delete by the admin.
 - `participants/**`: write by the admin only; readable by any signed-in user (the join form offers "who are you?"). It holds only coach and team names.
+- `results/**`: write by the admin only (validated: two different participants, whole-number scores, `source` sheet/admin); members read.
 - `members/**`, `league/config`: write by the admin only.
 - **Everyone else gets nothing;** signed-in strangers only see the participant list.
-- Rules are tested with the Firebase emulator: `cd firebase && npm test` (28 tests, incl. a check that a weakened rule makes them fail). See [firebase/README.md](../firebase/README.md).
+- Rules are tested with the Firebase emulator: `cd firebase && npm test` (31 tests, incl. a check that a weakened rule makes them fail). See [firebase/README.md](../firebase/README.md).
 
 ### Joining the league
 1. A coach opens the app → **League** → "Sign in with Google".
@@ -86,6 +88,19 @@ coaches/{uid}/matches/{matchId}  { match, events[], hash, updatedAt }     owner 
   - Removing a member together with their data frees their entry again.
 - The league team page lists the team's games from the league's view, including games others logged against it.
 
+### League records (the old sheet, games without the app)
+- **Games between two coaches who don't use the app** have no record in the app. The admin keeps them as *results* (`results/{rid}`: two participant ids, score, optional casualties, date): **Results → + Result** (decided 2026-11-17: the admin enters them in the app; the spreadsheet is retired).
+- **Importing the old sheet:** Admin → *Import the league sheet (CSV)* reads the Google Sheet's CSV export (one cross table per month, "Coach" in the corner, scores as row:column). It adds missing coaches to the participant list (linked to the member with the same coach name, if there's exactly one) and saves every score as a result with its month (`month: 'YYYY-MM'`, id `sheet-<month>-<pids>`). Importing again updates them and deletes results that disappeared from the imported months. The preview says how many games coaches already logged in the app.
+- **A coach's record replaces a result** (it has the details: TDs, casualties, SPP) when it is linked to it (`match.resultId`, set by "Log a past game"), or it's the same two teams with the same score within the result's month or the month after (league rule: a pair plays once per month; catch-up games from earlier months are allowed), or within 14 days of a dated result. Results shows "✓ in the league records".
+- **Same teams, close in time, other score:** both count, and Results flags it ("maybe the same game as …"), so the score can be fixed in the record, or the result deleted.
+- The table is one season total (no per-month tables; decided 2026-11-17).
+
+### Coaches who join later: past games
+- They don't need to re-enter anything for the table: once linked, every result and every record against their entry counts for their team.
+- They enter their team as it is now (players with skills, SPP adjustment, injuries; treasury).
+- **Team → Games → Log a past game** (optional, for their players' stats and SPP): opponent, date, score, per player TDs / casualties / completions / interceptions, MVP, casualties suffered. No pre- or post-game sequence: treasury, fans and injuries aren't touched. It ends draft mode (without zeroing the treasury).
+  - *Already in the league* lists their games they haven't logged themselves: results (old sheet, admin) and games the opponent logged. Picking one fills in opponent, date, score and casualties, and links it (`resultId`) or uses the opponent's exact date, so the game still counts once.
+
 ### League view (new tab)
 - Tabs: **Table · Results · Teams · Leaders** (+ **Admin** for the admin: join requests, participant list, members).
 - **Teams:** every coach's teams, plus participants not in the app yet. Read-only team and player pages, built from the same components and logic as the own pages (the own pages are full of edit actions, so they aren't reused directly).
@@ -109,6 +124,7 @@ coaches/{uid}/matches/{matchId}  { match, events[], hash, updatedAt }     owner 
 - [x] End-to-end test against the emulators (admin + coach in two browser profiles): `cd firebase && npm run e2e`
 - [x] Admin id filled in (2026-11-17)
 - [x] Participant list: games against listed coaches count even before they're in the app; they pick their entry when joining (2026-11-17)
+- [x] League records: import of the old league sheet, admin-entered results, "Log a past game" for coaches who join later (2026-11-17)
 - [ ] Rules deployed (you)
 - [ ] Two-phone test, then roll out
 
@@ -118,7 +134,7 @@ coaches/{uid}/matches/{matchId}  { match, events[], hash, updatedAt }     owner 
    - **CLI (on the Mac):** `cd firebase && npm install && npx firebase login && npm run deploy:rules`
 2. **Find your user id.** Sign in once (League tab → Sign in with Google), either on the live app after the next push to `main`, or locally (`cd app && npm run dev`, open http://localhost:5179 on the Mac; `localhost` is an authorized domain by default). The League tab then shows "user id …": tap it to copy. (It's also in the Firebase console → Authentication → Users.)
 3. **Make it the admin id.** Put it in `adminUid()` in `firebase/firestore.rules` and in `LEAGUE_ADMIN_UID` in `app/src/league.config.ts` (or send it to me), deploy the rules again, push the app.
-4. **Fill in the participant list:** League → Admin → Participants → *+ Add*, one entry per coach (yourself included). If you already joined, link your own entry via *In the app as*.
+4. **Fill in the participant list and the results so far:** League → Admin → *Import the league sheet (CSV)* with the Google Sheet's CSV export (File → Download → CSV). It adds every coach (your own entry is linked to you if your coach name matches) and the November results. Then add team names and rosters per entry if you like (Participants → tap an entry). Coaches not on the sheet: *+ Add*.
 5. **Join as admin** (if not done yet): League tab → pick your entry → *Join as admin*. Your teams and finished games are published within seconds.
 6. **Two-phone test** with a second Google account: request to join, approve it in League → Admin, play or edit a game, check Table / Results / Leaders on both phones. Also test Google sign-in from the iPhone home-screen app.
-7. **Roll out:** send the league the app link. Each coach: League → Sign in → pick their name → Request to join; you approve.
+7. **Roll out:** send the league the app link. Each coach: League → Sign in → pick their name → Request to join; you approve. New coaches enter their team as it is now; past games are optional (Team → Games → *Log a past game*). From then on, games between two coaches without the app go in via Results → *+ Result*.

@@ -4,14 +4,16 @@ import { getRoster, ROSTERS } from '../rules/data'
 import { LEVEL_NAMES, STAT_LABEL } from '../rules/sevens'
 import type { Stat } from '../rules/types'
 import {
-  approve, deleteParticipant, linkParticipant, reject, removeMember, saveParticipant, setLeagueTeam, startData, useLeague, type LeagueData, type LeagueTeam, type Participant,
+  approve, deleteParticipant, deleteResult, importSheet, linkParticipant, newParticipantId, reject, removeMember, saveParticipant, saveResult, setLeagueTeam, startData, useLeague,
+  type LeagueData, type LeagueResult, type LeagueTeam, type Participant,
 } from '../logic/league'
 import { findTeam, headToHead, isPaper, leagueGames, leaguePlayers, leagueTable, paperTeams, participantTeam, teamKey, type LeagueGame, type PaperTeam } from '../logic/leagueTable'
 import { fmtTarget, playerValue, profile, statDelta, teamValue } from '../logic/team'
 import { computeStats, teamRecord } from '../logic/stats'
 import { fmtDate, gp } from '../logic/format'
+import { fmtMonth, monthDate, parseLeagueSheet, type SheetParse } from '../logic/sheetImport'
 import { LeagueJoin } from '../components/LeagueAccount'
-import { Badge, Button, Card, Empty, Field, H2, inputCls, Page, Sheet, useSettings } from '../components/ui'
+import { Badge, Button, Card, Empty, Field, H2, inputCls, NumberInput, Page, Sheet, useSettings } from '../components/ui'
 import { PlayerRow } from './TeamPage'
 import { BOARDS } from './Stats'
 
@@ -120,57 +122,176 @@ function TableTab({ data, games }: { data: LeagueData; games: LeagueGame[] }) {
       </Card>
       <div className="px-1 text-[11px] leading-relaxed text-white/40">
         Win 3 · draw 1 · loss 0. Ties: TD difference, then CAS difference. A game both coaches logged counts once.
-        📝 = not in the app yet: their row has the games others logged against them. When they join, they pick their name from the league list and the games move to their team.
+        📝 = not in the app yet: their row has the games others logged against them and the results in the league records. When they join, they pick their name from the league list and the games move to their team.
         Games against opponents not on the list (friendlies) don’t count.
       </div>
     </>
   )
 }
 
-function GameCard({ g, data, onPaper }: { g: LeagueGame; data: LeagueData; onPaper?: (key: string) => void }) {
+/** Display name/coach of a game side: the team in the app, else the participant (📝) or the typed opponent. */
+function sideOf(data: LeagueData, key: string | null, paper?: { name: string; coach: string }) {
+  const t = findTeam(data, key)
+  return t ? { t, name: t.team.name, coach: t.coach } : { name: paper?.name ?? '', coach: paper?.coach ?? '', paper: isPaper(key) }
+}
+export const gameDate = (g: LeagueGame) => (g.result?.month && !g.records.length ? fmtMonth(g.result.month) : fmtDate(g.date))
+
+function GameCard({ g, data, onPaper, onEdit }: { g: LeagueGame; data: LeagueData; onPaper?: (key: string) => void; onEdit?: (r: LeagueResult) => void }) {
   const nav = useNavigate()
-  const a = findTeam(data, g.a)
-  const b = findTeam(data, g.b)
-  const paper = isPaper(g.b)
+  const a = sideOf(data, g.a, g.paperA)
+  const b = sideOf(data, g.b, g.paper)
   const loggedBy = g.records.map((r) => data.coachName[r.uid] ?? '?')
+  const open = (x: ReturnType<typeof sideOf>, key: string | null) => (x.t ? nav(teamLink(x.t)) : x.paper && onPaper?.(key!))
+  const sub = (x: ReturnType<typeof sideOf>, key: string | null) => (x.t ? x.coach : x.paper ? `📝 ${x.coach || 'not in the app'}` : key === null ? x.coach || 'not on the list' : x.coach)
+  const recorded = !g.records.length && g.result
+  const ms = g.maybeSame
+  const msScore = ms && (ms.a === g.a ? `${ms.score.a}–${ms.score.b}` : `${ms.score.b}–${ms.score.a}`)
   return (
-    <Card className={`!p-2.5 ${g.mismatch ? 'border-red-400/50' : ''}`}>
+    <Card className={`!p-2.5 ${g.mismatch || ms ? 'border-red-400/50' : ''}`}>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm">
-        <button className="truncate text-left font-semibold" onClick={() => a && nav(teamLink(a))}>
-          {a?.team.name}
-          <div className="truncate text-[11px] font-normal text-white/40">{a?.coach}</div>
+        <button className="truncate text-left font-semibold" onClick={() => open(a, g.a)}>
+          {a.name}
+          <div className="truncate text-[11px] font-normal text-white/40">{sub(a, g.a)}</div>
         </button>
         <div className="text-xl font-black tabular-nums">
           {g.score.a}–{g.score.b}
         </div>
-        <button className="truncate text-right font-semibold" onClick={() => (b ? nav(teamLink(b)) : paper && onPaper?.(g.b!))}>
-          {b?.team.name ?? g.paper?.name}
-          <div className="truncate text-[11px] font-normal text-white/40">{b ? b.coach : paper ? `📝 ${g.paper?.coach || 'not in the app'}` : g.paper?.coach || 'not on the list'}</div>
+        <button className="truncate text-right font-semibold" onClick={() => open(b, g.b)}>
+          {b.name}
+          <div className="truncate text-[11px] font-normal text-white/40">{sub(b, g.b)}</div>
         </button>
       </div>
       <div className="mt-1 flex flex-wrap justify-between gap-1 text-[11px] text-white/40">
         <span>
-          {fmtDate(g.date)} · CAS {g.cas.a}–{g.cas.b}
+          {gameDate(g)} · CAS {g.cas.a}–{g.cas.b}
         </span>
-        <span>{!g.b ? 'not counted: opponent not on the league list' : g.records.length === 2 ? '✓ logged by both' : `logged by ${loggedBy[0]}${paper ? '' : ' only'}`}</span>
+        <span>
+          {!g.b
+            ? 'not counted: opponent not on the league list'
+            : recorded
+              ? `📋 league records${recorded.source === 'sheet' ? ' (old sheet)' : ''}`
+              : g.records.length === 2
+                ? '✓ logged by both'
+                : `logged by ${loggedBy[0]}${b.paper || a.paper ? '' : ' only'}`}
+          {g.result && !recorded ? ' · ✓ in the league records' : ''}
+          {recorded && onEdit && (
+            <button className="ml-2 text-gold" onClick={() => onEdit(recorded)}>
+              Edit
+            </button>
+          )}
+        </span>
       </div>
       {g.mismatch && <div className="mt-1 text-xs text-red-300">⚠️ {g.mismatch}. Fix the score in one of the match records.</div>}
+      {ms && (
+        <div className="mt-1 text-xs text-red-300">
+          ⚠️ Maybe the same game as {data.coachName[ms.records[0]?.uid] ?? '?'}’s record of {fmtDate(ms.date)} ({msScore}). If it is, fix the score in that record (then they count once) or delete this result.
+        </div>
+      )}
     </Card>
   )
 }
 
 function ResultsTab({ data, games }: { data: LeagueData; games: LeagueGame[] }) {
+  const L = useLeague()
   const [paper, setPaper] = useState<string>()
-  const flagged = games.filter((g) => g.mismatch)
-  if (!games.length) return <Empty>No finished games published yet.</Empty>
+  const [edit, setEdit] = useState<Partial<LeagueResult>>()
+  const flagged = games.filter((g) => g.mismatch || g.maybeSame)
   return (
     <>
       <PaperSheet data={data} games={games} paperKey={paper} onClose={() => setPaper(undefined)} />
-      {flagged.length > 0 && <div className="px-1 text-xs text-red-300">⚠️ {flagged.length} game{flagged.length > 1 ? 's' : ''} logged differently by the two coaches.</div>}
+      {L.isAdmin && <ResultSheet data={data} r={edit} onClose={() => setEdit(undefined)} />}
+      {L.isAdmin && (
+        <div className="flex items-center justify-between gap-2 px-1">
+          <span className="text-[11px] text-white/40">For games where neither coach uses the app.</span>
+          <Button variant="soft" className="shrink-0 !px-3 !py-1.5 text-xs" disabled={data.participants.length < 2} onClick={() => setEdit({ date: Date.now() })}>
+            + Result
+          </Button>
+        </div>
+      )}
+      {!games.length && <Empty>No finished games published yet.</Empty>}
+      {flagged.length > 0 && <div className="px-1 text-xs text-red-300">⚠️ {flagged.length} game{flagged.length > 1 ? 's' : ''} recorded differently: see below.</div>}
       {games.map((g) => (
-        <GameCard key={g.id} g={g} data={data} onPaper={setPaper} />
+        <GameCard key={g.id} g={g} data={data} onPaper={setPaper} onEdit={L.isAdmin ? setEdit : undefined} />
       ))}
     </>
+  )
+}
+
+/** Admin: record (or fix) a result between two participants: for games where neither coach uses the app. */
+function ResultSheet({ data, r, onClose }: { data: LeagueData; r?: Partial<LeagueResult>; onClose: () => void }) {
+  const [f, setF] = useState<Partial<LeagueResult>>({})
+  const [busy, setBusy] = useState(false)
+  useEffect(() => setF(r ?? {}), [r])
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true)
+    try {
+      await fn()
+      onClose()
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const ps = [...data.participants].sort((x, y) => x.coach.localeCompare(y.coach))
+  const label = (p: Participant) => `${p.coach}${p.team ? ` · ${p.team}` : ''}`
+  const score = f.score ?? { a: 0, b: 0 }
+  const cas = f.cas ?? { a: 0, b: 0 }
+  const ok = f.a && f.b && f.a !== f.b
+  const pick = (k: 'a' | 'b') => (
+    <select className={inputCls} value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value || undefined })}>
+      <option value="">– pick –</option>
+      {ps.map((p) => (
+        <option key={p.id} value={p.id}>
+          {label(p)}
+        </option>
+      ))}
+    </select>
+  )
+  return (
+    <Sheet open={!!r} onClose={onClose} title={r?.id ? 'League result' : 'Add a result'}>
+      <div className="space-y-3">
+        <div className="grid grid-cols-[1fr_4.5rem] items-end gap-2">
+          <Field label="Coach">{pick('a')}</Field>
+          <Field label="Score"><NumberInput value={score.a} onChange={(v) => setF({ ...f, score: { ...score, a: v } })} /></Field>
+          <Field label="Opponent">{pick('b')}</Field>
+          <Field label="Score"><NumberInput value={score.b} onChange={(v) => setF({ ...f, score: { ...score, b: v } })} /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="CAS (coach)"><NumberInput value={cas.a} onChange={(v) => setF({ ...f, cas: { ...cas, a: v } })} /></Field>
+          <Field label="CAS (opponent)"><NumberInput value={cas.b} onChange={(v) => setF({ ...f, cas: { ...cas, b: v } })} /></Field>
+        </div>
+        {f.month ? (
+          <div className="text-xs text-white/50">From the old league sheet: {fmtMonth(f.month)}</div>
+        ) : (
+          <Field label="Date">
+            <input type="date" className={inputCls} value={new Date(f.date ?? Date.now()).toISOString().slice(0, 10)} onChange={(e) => e.target.value && setF({ ...f, date: new Date(`${e.target.value}T12:00`).getTime() })} />
+          </Field>
+        )}
+        <Button
+          className="w-full"
+          disabled={busy || !ok}
+          onClick={() =>
+            run(() =>
+              saveResult({
+                id: f.id, a: f.a!, b: f.b!, score, date: f.date ?? Date.now(), month: f.month, source: f.source ?? 'admin',
+                ...(cas.a || cas.b ? { cas } : {}),
+              }),
+            )
+          }
+        >
+          Save
+        </Button>
+        {r?.id && (
+          <Button variant="ghost" className="w-full text-red-300" disabled={busy} onClick={() => confirm('Delete this result?') && run(() => deleteResult(r.id!))}>
+            Delete result
+          </Button>
+        )}
+        <div className="text-[11px] leading-relaxed text-white/40">
+          If a coach logs the same game in the app (same score, within that month or the next), their record replaces this result automatically.
+        </div>
+      </div>
+    </Sheet>
   )
 }
 
@@ -184,19 +305,21 @@ function PaperSheet({ data, games, paperKey, onClose }: { data: LeagueData; game
         <div className="space-y-3 text-sm">
           <div className="text-white/60">
             📝 {joined ? `${data.coachName[joined] ?? pt.coach} has joined but hasn't published this team yet.` : `${pt.coach} isn't in the app yet.`}{' '}
-            {pt.games.length ? `These ${pt.games.length} game${pt.games.length > 1 ? 's' : ''} count from the other coaches' records:` : 'No games against them yet.'}
+            {pt.games.length ? `These ${pt.games.length} game${pt.games.length > 1 ? 's' : ''} count, from the other coaches' records and the league records (📋):` : 'No games against them yet.'}
           </div>
           {pt.games.length > 0 && (
             <Card className="!p-2 space-y-1">
               {pt.games.map((g) => {
-                const a = findTeam(data, g.a)
+                const home = g.a === pt.key
+                const o = home ? sideOf(data, g.b, g.paper) : sideOf(data, g.a, g.paperA)
                 return (
                   <div key={g.id} className="flex justify-between gap-2 text-xs">
                     <span className="truncate">
-                      {fmtDate(g.date)} · vs {a?.team.name} <span className="text-white/40">({a?.coach})</span>
+                      {gameDate(g)} · vs {o.name} {o.coach && o.coach !== o.name && <span className="text-white/40">({o.coach})</span>}
+                      {!g.records.length && <span className="text-white/40"> · 📋</span>}
                     </span>
                     <span className="shrink-0 font-bold tabular-nums">
-                      {g.score.b}–{g.score.a}
+                      {home ? `${g.score.a}–${g.score.b}` : `${g.score.b}–${g.score.a}`}
                     </span>
                   </div>
                 )
@@ -362,6 +485,7 @@ function AdminTab({ data }: { data: LeagueData }) {
   const [busy, setBusy] = useState(false)
   const [pick, setPick] = useState<Record<string, string>>({})
   const [edit, setEdit] = useState<Partial<Participant>>()
+  const [importing, setImporting] = useState(false)
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true)
     try {
@@ -377,6 +501,7 @@ function AdminTab({ data }: { data: LeagueData }) {
   return (
     <>
       <ParticipantSheet data={data} p={edit} onClose={() => setEdit(undefined)} />
+      <ImportSheet data={data} open={importing} onClose={() => setImporting(false)} />
       <H2>Join requests</H2>
       {!L.requests?.length && <div className="px-1 text-sm text-white/40">No pending requests.</div>}
       {L.requests?.map((r) => {
@@ -437,6 +562,9 @@ function AdminTab({ data }: { data: LeagueData }) {
       <div className="px-1 text-[11px] leading-relaxed text-white/40">
         Games only count against coaches on this list. A joining coach picks their entry; you confirm it when approving. 📝 = not in the app yet.
       </div>
+      <Button variant="soft" className="w-full" onClick={() => setImporting(true)}>
+        📥 Import the league sheet (CSV)
+      </Button>
       <H2>Members</H2>
       <Card className="space-y-1.5">
         {data.members.map((m) => (
@@ -536,6 +664,109 @@ function ParticipantSheet({ data, p, onClose }: { data: LeagueData; p?: Partial<
   )
 }
 
+/**
+ * Admin: import the old league sheet (CSV): adds missing coaches to the participant list and records every score
+ * as a result. Importing again updates them (results that were removed from the sheet's months are deleted).
+ */
+function ImportSheet({ data, open, onClose }: { data: LeagueData; open: boolean; onClose: () => void }) {
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<string>()
+  useEffect(() => {
+    if (open) (setText(''), setDone(undefined))
+  }, [open])
+  const parsed: SheetParse | undefined = useMemo(() => (text.trim() ? parseLeagueSheet(text) : undefined), [text])
+  const norm = (x: string) => x.trim().toLowerCase()
+  const byCoach = new Map(data.participants.map((p) => [norm(p.coach), p]))
+  const fresh = parsed?.coaches.filter((c) => !byCoach.has(norm(c))) ?? []
+  // a new entry whose name is exactly one member's coach name (not on the list yet) is linked to them
+  const linkTo = (coach: string) => {
+    const ms = data.members.filter((m) => norm(m.coach) === norm(coach) && !data.participants.some((p) => p.uid === m.uid))
+    return ms.length === 1 ? ms[0] : undefined
+  }
+  const linkedNew = fresh.filter((c) => linkTo(c))
+  // what the table will look like: how many of the sheet's games coaches already logged in the app
+  const preview = useMemo(() => {
+    if (!parsed) return undefined
+    const ids = new Map(parsed.coaches.map((c) => [norm(c), byCoach.get(norm(c))?.id ?? `new:${norm(c)}`]))
+    const results = parsed.games.map((g, i): LeagueResult => ({ id: `preview${i}`, a: ids.get(norm(g.a))!, b: ids.get(norm(g.b))!, score: { a: g.sa, b: g.sb }, date: monthDate(g.month), month: g.month, source: 'sheet' }))
+    const participants = [...data.participants, ...fresh.map((c) => ({ id: `new:${norm(c)}`, coach: c, team: '', uid: linkTo(c)?.uid }))]
+    const gs = leagueGames({ ...data, participants, results: [...data.results.filter((x) => x.source !== 'sheet' || !parsed.months.includes(x.month ?? '')), ...results] })
+    return { inApp: gs.filter((g) => g.result?.id.startsWith('preview') && g.records.length).length, unsure: gs.filter((g) => g.result?.id.startsWith('preview') && g.maybeSame).length }
+  }, [parsed, data])
+  const go = async () => {
+    if (!parsed) return
+    setBusy(true)
+    try {
+      const added = await Promise.all(fresh.map(async (coach) => ({ id: await newParticipantId(), coach, uid: linkTo(coach)?.uid })))
+      const pid = new Map([...data.participants.map((p) => [norm(p.coach), p.id] as const), ...added.map((p) => [norm(p.coach), p.id] as const)])
+      const results: LeagueResult[] = parsed.games.map((g) => {
+        const a = pid.get(norm(g.a))!
+        const b = pid.get(norm(g.b))!
+        return { id: `sheet-${g.month}-${[a, b].sort().join('-')}`, a, b, score: { a: g.sa, b: g.sb }, date: monthDate(g.month), month: g.month, source: 'sheet' }
+      })
+      const keep = new Set(results.map((x) => x.id))
+      const remove = data.results.filter((x) => x.source === 'sheet' && parsed.months.includes(x.month ?? '') && !keep.has(x.id)).map((x) => x.id)
+      await importSheet(added, results, remove)
+      setDone(`Imported: ${added.length} new coach${added.length === 1 ? '' : 'es'}, ${results.length} results${remove.length ? `, ${remove.length} removed` : ''}.`)
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const perMonth = parsed?.months.map((m) => `${fmtMonth(m)}: ${parsed.games.filter((g) => g.month === m).length}`).join(' · ')
+  return (
+    <Sheet open={open} onClose={onClose} title="Import the league sheet">
+      <div className="space-y-3 text-sm">
+        <div className="text-xs text-white/60">
+          Google Sheets: <b>File → Download → CSV</b> (per tab). One table per month with “Coach” in the corner, scores as row:column (e.g. 2:1).
+        </div>
+        <input
+          type="file"
+          accept=".csv,text/csv,text/plain"
+          className="block w-full text-xs"
+          onChange={async (e) => {
+            const file = e.target.files?.[0]
+            if (file) setText(await file.text())
+          }}
+        />
+        <textarea className={`${inputCls} h-24 font-mono text-xs`} placeholder="…or paste the CSV here" value={text} onChange={(e) => setText(e.target.value)} />
+        {parsed && (
+          <Card className="space-y-1.5 text-xs">
+            <div>
+              <b>{parsed.coaches.length} coaches</b>
+              {fresh.length ? `, ${fresh.length} new on the participant list: ${fresh.join(', ')}` : ', all on the participant list already'}
+            </div>
+            {linkedNew.length > 0 && <div>🔗 Linked to the coach in the app with that name: {linkedNew.join(', ')} (change in Participants → In the app as).</div>}
+            <div>
+              <b>{parsed.games.length} results</b> ({perMonth})
+            </div>
+            {preview && preview.inApp > 0 && <div className="text-turf">✓ {preview.inApp} of them are already logged in the app: those count once, from the coach’s record.</div>}
+            {preview && preview.unsure > 0 && <div className="text-amber-300">⚠️ {preview.unsure} look like a game a coach logged with another score: check them in Results after importing.</div>}
+            {parsed.warnings.map((w) => (
+              <div key={w} className="text-amber-300">
+                ⚠️ {w}
+              </div>
+            ))}
+          </Card>
+        )}
+        {done ? (
+          <div className="rounded-xl bg-turf/15 p-2 text-xs">✓ {done}</div>
+        ) : (
+          <Button className="w-full" disabled={busy || !parsed?.months.length} onClick={go}>
+            {busy ? 'Importing…' : 'Import'}
+          </Button>
+        )}
+        <div className="text-[11px] leading-relaxed text-white/40">
+          New coaches get an entry with just their name: add team name and roster in Participants (or leave them, they show the coach name). Importing again updates the results.
+          Once the app is live, add new results with Results → + Result instead.
+        </div>
+      </div>
+    </Sheet>
+  )
+}
+
 // ---------- read-only team & player ----------
 
 function useLeagueTeam() {
@@ -562,7 +793,7 @@ export function LeagueTeamPage() {
     .filter((g) => g.a === key || g.b === key)
     .map((g) => {
       const home = g.a === key
-      const opp = home ? (findTeam(data, g.b) ?? (g.paper && { team: { name: g.paper.name }, coach: g.paper.coach })) : findTeam(data, g.a)
+      const opp = home ? sideOf(data!, g.b, g.paper) : sideOf(data!, g.a, g.paperA)
       return { g, us: home ? g.score.a : g.score.b, them: home ? g.score.b : g.score.a, opp, mine: g.records.some((r) => r.uid === t.uid) }
     })
   const rec = { w: games.filter((x) => x.us > x.them).length, d: games.filter((x) => x.us === x.them).length, l: games.filter((x) => x.us < x.them).length }
@@ -613,11 +844,11 @@ export function LeagueTeamPage() {
           <Card key={g.id} className="!p-2.5">
             <div className="flex items-center justify-between text-sm">
               <div className="min-w-0">
-                <div className="truncate font-semibold">vs {opp?.team.name || 'Opponent'}</div>
+                <div className="truncate font-semibold">vs {opp.name || 'Opponent'}</div>
                 <div className="truncate text-[11px] text-white/40">
-                  {fmtDate(g.date)}
-                  {opp?.coach ? ` · ${opp.coach}` : ''}
-                  {!mine ? ` · logged by ${g.records.map((x) => data!.coachName[x.uid] ?? '?').join(', ')}` : ''}
+                  {gameDate(g)}
+                  {opp.coach ? ` · ${opp.coach}` : ''}
+                  {!g.records.length ? ' · 📋 league records' : !mine ? ` · logged by ${g.records.map((x) => data!.coachName[x.uid] ?? '?').join(', ')}` : ''}
                   {g.b === null ? ' · not counted' : ''}
                 </div>
               </div>

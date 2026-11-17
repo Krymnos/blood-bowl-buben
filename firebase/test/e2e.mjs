@@ -225,6 +225,85 @@ await C.shot('joined-table')
 await click(A, 'table')
 check(await waitText(A, 'Grünhaut Gang'), 'admin’s table shows it live')
 
+// 5c. admin imports the old league sheet: new coaches join the list, scores become league results
+const sheet = [
+  ',Blood Bowl League,,,,,',
+  ',November,,,,,',
+  ',Coach,Ron,Max,Olaf,Pia,,Pts',
+  ',Ron,x,,,,,0',
+  ',Max,,x,0:1,,,0',
+  ',Olaf,,1:0,x,2:2,,4',
+  ',Pia,,,2:2,x,,1',
+  ',Dezember,,,,,',
+  ',Coach,Ron,Max,Olaf,Pia,,Pts',
+  ',Ron,x,,,,,0',
+].join('\n')
+await click(A, 'admin')
+await click(A, 'Import the league sheet')
+await waitText(A, 'paste the CSV')
+await A.$eval('textarea', (el, v) => {
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(el, v)
+  el.dispatchEvent(new Event('input', { bubbles: true }))
+}, sheet)
+check(await waitText(A, '2 new on the participant list: Ron, Pia') && (await text(A)).includes('2 results'), 'import preview: new coaches and results')
+check((await text(A)).includes('linked to the coach in the app with that name: ron'), 'import links the admin’s own new entry to their account')
+await A.shot('import-preview')
+await click(A, 'Import', 'button.w-full')
+check(await waitText(A, 'Imported: 2 new coaches, 2 results'), 'import done')
+const results = await fsList('results')
+check(results.length === 2 && results.every((id) => id.startsWith('sheet-')), `results saved (${results.join(', ')})`)
+const parts = await Promise.all((await fsList('participants')).map(async (id) => ({ id, ...(await fsGet(`participants/${id}`)).fields })))
+check(parts.find((p) => p.coach.stringValue === 'Ron')?.uid?.stringValue === 'admin-uid', 'Ron’s entry is linked to the admin')
+await A.keyboard.press('Escape')
+await A.evaluate(() => (location.hash = '#/'))
+await A.evaluate(() => (location.hash = '#/league'))
+await click(A, 'table')
+await sleep(1000)
+const tblI = await text(A)
+check(/pia\s+📝 pia · not in the app\s+1\s/.test(tblI) && /nordmänner\s+📝 olaf · not in the app\s+2\s/.test(tblI), 'sheet results count for coaches not in the app')
+check(/gearwhackers\s+max\s+3\s/.test(tblI), 'a sheet result counts for a coach in the app')
+check(!/\bron\s+📝/.test(tblI), 'no duplicate 📝 row for the admin')
+await A.shot('table-imported')
+await click(A, 'results')
+check(await waitText(A, 'league records (old sheet)'), 'results list shows sheet results')
+// admin records a paper-vs-paper game
+await click(A, '+ Result')
+await waitText(A, 'Add a result')
+const pidOf = (c) => parts.find((p) => p.coach.stringValue === c).id
+const sels = await A.$$('select')
+await sels[0].select(pidOf('Olaf'))
+await sels[1].select(pidOf('Pia'))
+await click(A, 'Save', 'button.w-full')
+await sleep(1000)
+check((await fsList('results')).length === 3, 'admin adds a result by hand')
+await A.shot('results')
+
+// 5d. Lena logs a past game she played on paper: picks Ron’s record, so it still counts once
+const lenaTeam = await C.evaluate(() => new Promise((res) => {
+  const r = indexedDB.open('sevens-dugout')
+  r.onsuccess = () => (r.result.transaction('teams').objectStore('teams').getAll().onsuccess = (e) => (res(e.target.result[0].id), r.result.close()))
+}))
+await C.evaluate((id) => (location.hash = `#/team/${id}/past`), lenaTeam)
+check(await waitText(C, 'Already in the league'), 'past-game form lists her games logged by others')
+await click(C, 'logged by Ron', 'button.flex')
+await sleep(300)
+await C.shot('past-game')
+const nums = await C.$$('input[type="number"][placeholder="0"]')
+if (nums[1]) await nums[1].type('1') // a casualty (a TD could change the score)
+await click(C, 'Save game')
+check(await C.waitForFunction(() => /#\/match\/\d+$/.test(location.hash), { timeout: 10000 }).then(() => true, () => false), 'past game saved, match report opens')
+await C.evaluate(() => (location.hash = '#/settings'))
+await click(C, 'Sync now')
+await sleep(2500)
+check((await fsList('coaches/lena-uid/matches')).length === 1, 'past game published')
+await C.evaluate(() => (location.hash = '#/league'))
+await click(C, 'table')
+await sleep(1500)
+check(/grünhaut gang\s+lena\s+2\s/.test(await text(C)), 'Lena still has 2 games: her record is paired with Ron’s')
+await click(C, 'results')
+check(await waitText(C, 'logged by both'), 'the game shows as logged by both')
+await C.shot('past-paired')
+
 // 6. second device for the admin → conflict instead of silent overwrite
 const A2 = await phone('admin2')
 await setup(A2, 'ron@example.com')

@@ -1,7 +1,7 @@
 /** League-wide results: pairing both coaches' records of a game, the table, head-to-head and leaderboards. */
 import type { LeagueRef, MatchEvent } from '../db'
 import type { LeagueSettings } from '../rules/sevens'
-import type { LeagueData, LeagueMatch, LeagueTeam, Participant } from './league'
+import type { LeagueData, LeagueMatch, LeagueResult, LeagueTeam, Participant } from './league'
 import { computeStats, type PlayerStats } from './stats'
 
 export const teamKey = (r: LeagueRef) => `${r.uid}:${r.teamId}`
@@ -10,6 +10,25 @@ const norm = (s: string) => s.trim().toLowerCase()
 /** both records of one game must be logged within this window */
 const PAIR_WINDOW = 2 * 24 * 3600_000
 export const POINTS = { w: 3, d: 1, l: 0 }
+const DAY = 24 * 3600_000
+
+/** 'YYYY-MM' → first and last moment of that month (local time) */
+export function monthRange(month: string): [number, number] {
+  const [y, m] = month.split('-').map(Number)
+  return [new Date(y, m - 1, 1).getTime(), new Date(y, m, 1).getTime() - 1]
+}
+/**
+ * When a coach's record can be the same game as a recorded result (same two teams, same score): within the
+ * result's month or the month after (a pair plays once per month, catch-up games from earlier months are allowed),
+ * or within 14 days of a dated result.
+ */
+export function inResultWindow(r: Pick<LeagueResult, 'date' | 'month'>, date: number) {
+  if (r.month) {
+    const [from, to] = monthRange(r.month)
+    return date >= from && date <= to + 31 * DAY
+  }
+  return Math.abs(date - r.date) <= 14 * DAY
+}
 
 const casFor = (ev: MatchEvent[]) => ev.filter((e) => e.type === 'cas' && e.side === 'us').length
 const casAgainst = (ev: MatchEvent[]) => ev.filter((e) => e.type === 'cas' && e.side === 'them' && e.cause !== 'self').length
@@ -17,7 +36,7 @@ const casAgainst = (ev: MatchEvent[]) => ev.filter((e) => e.type === 'cas' && e.
 export interface LeagueGame {
   id: string
   date: number
-  /** team key of side a (whose record is the primary one) */
+  /** side a: team key whose record is the primary one, or for a recorded result a team key / `#<pid>` */
   a: string
   /**
    * side b: a team key in the app, `#<pid>` (a participant not in the app yet), or null: not counted
@@ -26,12 +45,18 @@ export interface LeagueGame {
   b: string | null
   /** side b's name/coach when it isn't a team in the app (from the participant list, else as typed) */
   paper?: { name: string; coach: string }
+  /** side a's name/coach when it isn't a team in the app (only for recorded results) */
+  paperA?: { name: string; coach: string }
   score: { a: number; b: number }
   cas: { a: number; b: number }
-  /** one or both coaches' records */
+  /** one or both coaches' records; none for a recorded result no coach logged */
   records: LeagueMatch[]
-  /** both coaches logged it, but differently */
+  /** the admin's recorded result: the game itself (no records), or the one a coach's record replaced */
+  result?: LeagueResult
+  /** both coaches logged it, but differently (or differently from the recorded result it's linked to) */
   mismatch?: string
+  /** a recorded result that might be the same game as this coach's record (same teams, close, other score) */
+  maybeSame?: LeagueGame
 }
 
 /** Name key of an opponent (team name, else coach name): typed opponents are matched to the participant list by it. */
@@ -156,7 +181,70 @@ export function leagueGames(d: LeagueData): LeagueGame[] {
     }
     games.push(g)
   }
-  return games.sort((x, y) => y.date - x.date)
+  return addResults(d, res, games).sort((x, y) => y.date - x.date)
+}
+
+/**
+ * Recorded results count unless a coach's record is the same game: linked to it (`match.resultId`), or the same
+ * two teams with the same score in the result's window. Then the record counts (it has the details).
+ */
+function addResults(d: LeagueData, res: Resolver, games: LeagueGame[]): LeagueGame[] {
+  const pById = new Map(d.participants.map((p) => [p.id, p]))
+  type Cand = { r: LeagueResult; g: LeagueGame; flip: boolean; rank: number }
+  const cands: Cand[] = []
+  const sides = (r: LeagueResult) => [res.byPid.get(r.a), res.byPid.get(r.b)] as const
+  for (const r of d.results) {
+    const [ka, kb] = sides(r)
+    if (!ka || !kb || ka === kb) continue
+    for (const g of games) {
+      const flip = g.a === kb && g.b === ka
+      if (!flip && !(g.a === ka && g.b === kb)) continue
+      const [sa, sb] = flip ? [g.score.b, g.score.a] : [g.score.a, g.score.b]
+      const linked = g.records.some((m) => m.match.resultId === r.id)
+      if (linked) cands.push({ r, g, flip, rank: 0 })
+      else if (sa === r.score.a && sb === r.score.b && inResultWindow(r, g.date)) cands.push({ r, g, flip, rank: 1 + Math.abs(g.date - r.date) / DAY })
+    }
+  }
+  const taken = new Set<LeagueGame>()
+  const replaced = new Set<string>()
+  for (const c of cands.sort((x, y) => x.rank - y.rank)) {
+    if (taken.has(c.g) || replaced.has(c.r.id)) continue
+    taken.add(c.g)
+    replaced.add(c.r.id)
+    c.g.result = c.r
+    const [sa, sb] = c.flip ? [c.r.score.b, c.r.score.a] : [c.r.score.a, c.r.score.b]
+    if (sa !== c.g.score.a || sb !== c.g.score.b) {
+      const note = `the league records say ${sa}–${sb}`
+      c.g.mismatch = c.g.mismatch ? `${c.g.mismatch}; ${note}` : `Logged ${c.g.score.a}–${c.g.score.b}, but ${note}`
+    }
+  }
+  const out = [...games]
+  const label = (k: string, pid: string) => {
+    if (!isPaper(k)) return undefined
+    const p = pById.get(pid)
+    return { name: p?.team || p?.coach || '?', coach: p?.coach ?? '' }
+  }
+  for (const r of d.results) {
+    if (replaced.has(r.id)) continue
+    const [ka, kb] = sides(r)
+    if (!ka || !kb || ka === kb) continue
+    const g: LeagueGame = {
+      id: `r:${r.id}`,
+      date: r.date,
+      a: ka,
+      b: kb,
+      paperA: label(ka, r.a),
+      paper: label(kb, r.b),
+      score: { ...r.score },
+      cas: r.cas ? { ...r.cas } : { a: 0, b: 0 },
+      records: [],
+      result: r,
+    }
+    // same two teams, close in time, but another score: maybe the same game typed differently
+    g.maybeSame = games.find((x) => !x.result && ((x.a === ka && x.b === kb) || (x.a === kb && x.b === ka)) && inResultWindow(r, x.date))
+    out.push(g)
+  }
+  return out
 }
 
 export interface PaperTeam { key: string; participant: Participant; name: string; coach: string; games: LeagueGame[] }
@@ -167,7 +255,7 @@ export function paperTeams(d: LeagueData, games: LeagueGame[]): PaperTeam[] {
     .filter((p) => isPaper(r.byPid.get(p.id)))
     .map((p) => {
       const key = `#${p.id}`
-      return { key, participant: p, name: p.team || p.coach, coach: p.coach, games: games.filter((g) => g.b === key) }
+      return { key, participant: p, name: p.team || p.coach, coach: p.coach, games: games.filter((g) => g.a === key || g.b === key) }
     })
 }
 
@@ -233,7 +321,7 @@ export interface H2H { a: string; b: string; w: number; d: number; l: number; td
 export function headToHead(games: LeagueGame[]): H2H[] {
   const map = new Map<string, H2H>()
   for (const g of games) {
-    if (!g.b || isPaper(g.b)) continue
+    if (!g.b || isPaper(g.b) || isPaper(g.a)) continue
     let ua = g.a.split(':')[0]
     let ub = g.b.split(':')[0]
     if (ua === ub) continue
