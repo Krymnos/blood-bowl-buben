@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { HashRouter, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db'
@@ -12,6 +13,11 @@ import MatchReport from './pages/MatchReport'
 import Stats from './pages/Stats'
 import Settings from './pages/Settings'
 import Rules from './pages/Rules'
+
+// League pages are loaded only when used
+const League = lazy(() => import('./pages/League'))
+const LeagueTeamPage = lazy(() => import('./pages/League').then((m) => ({ default: m.LeagueTeamPage })))
+const LeaguePlayerPage = lazy(() => import('./pages/League').then((m) => ({ default: m.LeaguePlayerPage })))
 
 function MatchRouter() {
   const id = Number(useParams().mid)
@@ -43,6 +49,9 @@ function Nav() {
         <NavLink to="/" end className={cls}>
           <span className="text-xl">🏈</span>Teams
         </NavLink>
+        <NavLink to="/league" className={cls}>
+          <span className="text-xl">🏟️</span>League
+        </NavLink>
         <NavLink to="/stats" className={cls}>
           <span className="text-xl">📊</span>Stats
         </NavLink>
@@ -60,6 +69,7 @@ function Nav() {
 export default function App() {
   return (
     <HashRouter>
+      <Suspense fallback={null}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/team/new" element={<NewTeam />} />
@@ -70,7 +80,11 @@ export default function App() {
         <Route path="/rules" element={<Rules />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/league" element={<League />} />
+        <Route path="/league/:uid/:teamId" element={<LeagueTeamPage />} />
+        <Route path="/league/:uid/:teamId/:pid" element={<LeaguePlayerPage />} />
       </Routes>
+      </Suspense>
       <Nav />
     </HashRouter>
   )

@@ -9,6 +9,7 @@ import { Button, Card, Empty, H2, LinkButton, Page } from '../components/ui'
 import { seedDemo } from '../demo'
 import { CloudStatusLine } from '../components/CloudBackup'
 import { useCloudConfig } from '../logic/cloud'
+import { LeagueSyncLine } from '../components/LeagueAccount'
 
 export default function Home() {
   const nav = useNavigate()
@@ -87,6 +88,9 @@ export default function Home() {
       {data.teams.length > 0 && (
         <div className="px-1 pt-2 text-center text-xs" onClick={() => nav('/settings')}>
           {cloud ? <CloudStatusLine /> : <span className="text-amber-300/80">💾 Data is only on this phone · set up cloud backup in Settings ›</span>}
+          <div>
+            <LeagueSyncLine />
+          </div>
         </div>
       )}
     </Page>

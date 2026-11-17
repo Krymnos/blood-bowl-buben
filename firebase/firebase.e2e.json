@@ -1,0 +1,16 @@
+{
+  "firestore": {
+    "rules": "test/.e2e.rules"
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8181
+    },
+    "auth": {
+      "port": 9099
+    },
+    "ui": {
+      "enabled": false
+    }
+  }
+}

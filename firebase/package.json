@@ -1,0 +1,16 @@
+{
+  "name": "blood-bowl-buben-firebase",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "PATH=/opt/homebrew/opt/openjdk/bin:$PATH firebase emulators:exec --only firestore --project demo-buben 'node --test test/rules.test.mjs'",
+    "e2e": "node test/e2e-rules.mjs && PATH=/opt/homebrew/opt/openjdk/bin:$PATH firebase emulators:exec --config firebase.e2e.json --only auth,firestore --project demo-buben 'node test/e2e.mjs'",
+    "deploy:rules": "firebase deploy --only firestore:rules --project blood-bowl-buben"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.4.0",
+    "firebase-tools": "^15.36.0",
+    "puppeteer-core": "^25.17.0"
+  }
+}

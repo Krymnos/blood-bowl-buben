@@ -1,4 +1,4 @@
-# Blood Bowl Sevens Companion — Roadmap
+# Blood Bowl Buben — Roadmap
 
 **Ruleset target:** the league's *Verfassung Vol. 3* (see `DECISIONS.md`), on top of the official **Sevens** rules from *Spike! Journal 22* and the *Third Season Edition* rulebook.
 Only Sevens. No other formats.
@@ -10,7 +10,7 @@ Only Sevens. No other formats.
 - **Rules data lives separately from app code.** Rosters, skills, inducements, and tables go in versioned JSON, so a FAQ or errata update means editing data, not code.
 - **Assist, don't enforce.** The app does the arithmetic (TV, treasury, limits) and shows warnings, but the coach always has the final say, just like at the table.
 
-## Proposed tech stack
+## Tech stack
 
 | Layer | Choice | Why |
 |---|---|---|
@@ -19,6 +19,7 @@ Only Sevens. No other formats.
 | Local storage (prototype) | IndexedDB via Dexie | works offline, no server needed for Phase 1 |
 | Hosting | GitHub Pages (public code repo) | free, HTTPS (needed for a PWA), no server to maintain |
 | Backup | private GitHub repo via REST API | free, versioned, no own server |
+| League sync | Firebase Auth + Firestore, Spark plan | personal logins, access rules enforced on Google's side, free |
 
 ---
 
@@ -57,22 +58,26 @@ Only Sevens. No other formats.
 - Head-to-head records against each friend
 - Season / re-draft handling: 600k + treasury + 10k per win, capped at 750k; emergency call-ups (D6, a 1 removes the player)
 
+### Phase 3b: League sync ← **built, rolling out**
+Every coach publishes their teams and matches; everyone sees all teams, a league table and league-wide stats. Firebase (Google sign-in + Firestore), the phone stays the main copy. Plan and status: [docs/LEAGUE-SYNC-FIREBASE.md](docs/LEAGUE-SYNC-FIREBASE.md).
+
 ## Part 2: Online play — parked
 Not planned and may never be built. Details are in [docs/PART2-ONLINE-PLAY.md](docs/PART2-ONLINE-PLAY.md) (kept separate so it stays out of the way).
 
 ---
 
-## Status (2026-11-05)
-Prototype in `app/` covers **Phases 0–3**, aligned with the league's **Verfassung Vol. 3** (see `DECISIONS.md`):
+## Status (2026-11-17)
+Prototype in `app/` covers **Phases 0–3**, aligned with the league's **Verfassung Vol. 3** (see `DECISIONS.md`), live at https://krymnos.github.io/blood-bowl-buben/:
 - draft with "finish draft" (treasury → 0)
+- 31 Sevens rosters checked against bbroster.com (the league's roster source of truth), incl. NAF Slann
 - staff incl. Goblin lawyer and Star Player
 - pre-match steps 0–5 incl. journeymen and Petty-Cash-only inducements
-- live log with a re-roll tracker and tap-to-edit entries
+- live log with a re-roll tracker and tap-to-edit entries; TTM throw/landing on the main buttons, blocks only under "more"
+- injuries from own actions (failed dodge, rush, Nuffle), re-synced when a finished match log is edited
 - post-match steps 1–7 incl. concession, random MVP and buying journeymen
 - scouting rolls after advancing
 - the full rules reference in-app (📖 Rules tab)
 - everything editable after the fact
-
 - cloud backup to a private GitHub repository (auto after each game, conflict check, restore)
 
-**Next up:** set up the GitHub repositories and Pages (see `docs/HOSTING.md`).
+**League sync (Firebase)** is built: 🏟️ League tab with table, results, all teams (read-only) and league-wide leaderboards; opponent picker in pre-game; admin approval. Going live needs the rules deployed and the admin id set, see [docs/LEAGUE-SYNC-FIREBASE.md](docs/LEAGUE-SYNC-FIREBASE.md).

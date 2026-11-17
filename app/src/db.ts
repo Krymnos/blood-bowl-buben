@@ -69,6 +69,12 @@ export interface Player {
   journeyman?: boolean
 }
 
+/** A team in the league: Firebase uid of its coach + their local team id. */
+export interface LeagueRef {
+  uid: string
+  teamId: number
+}
+
 export type MatchStatus = 'setup' | 'live' | 'post' | 'done'
 
 export interface InducementPick {
@@ -82,7 +88,8 @@ export interface Match {
   teamId: number
   date: number
   status: MatchStatus
-  opponent: { name: string; coach: string; rosterId: string; ctv: number }
+  /** ref = the opponent's team in the league (picked from league teams), absent for guests */
+  opponent: { name: string; coach: string; rosterId: string; ctv: number; ref?: LeagueRef }
   ourCtv: number
   /** players eligible to play this game (snapshot at setup) */
   played: number[]

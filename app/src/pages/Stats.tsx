@@ -6,7 +6,7 @@ import { computeStats, resultOf, teamRecord, type PlayerStats } from '../logic/s
 import { gp } from '../logic/format'
 import { Card, Empty, H2, Page, useSettings } from '../components/ui'
 
-const BOARDS: { key: keyof PlayerStats; label: string; icon: string }[] = [
+export const BOARDS: { key: keyof PlayerStats; label: string; icon: string }[] = [
   { key: 'sppEarned', label: 'Star Player Points', icon: '⭐' },
   { key: 'td', label: 'Touchdowns', icon: '🏈' },
   { key: 'cas', label: 'Casualties (SPP)', icon: '🚑' },

@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, type LeagueSettings } from '../rules/sevens'
 import { exportAll, importAll } from '../logic/backup'
 import { seedDemo } from '../demo'
 import CloudBackup from '../components/CloudBackup'
+import LeagueAccount from '../components/LeagueAccount'
 import { Button, Card, H2, NumberInput, Page, useSettings } from '../components/ui'
 
 const SPP_LABELS: Record<keyof LeagueSettings['spp'], string> = {
@@ -88,6 +89,9 @@ export default function Settings() {
           Reset to league defaults (Verfassung Vol. 3)
         </Button>
       </Card>
+
+      <H2>League (Firebase)</H2>
+      <LeagueAccount />
 
       <H2>Cloud backup (GitHub)</H2>
       <CloudBackup />

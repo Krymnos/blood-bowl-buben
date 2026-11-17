@@ -8,6 +8,7 @@ import { addJourneymen, deleteMatch, linemanPositions, removeJourneyman } from '
 import { d } from '../logic/dice'
 import { gp } from '../logic/format'
 import { randomName } from '../logic/names'
+import OpponentPicker from '../components/OpponentPicker'
 import { Button, Card, DiceInput, Field, inputCls, LinkButton, NumberInput, Page, Stepper, Toggle, Step } from '../components/ui'
 
 export default function MatchSetup({ match: m }: { match: Match }) {
@@ -57,6 +58,7 @@ export default function MatchSetup({ match: m }: { match: Match }) {
     <Page title="Pre-game" sub={`${team.name} vs ${m.opponent.name || '…'}`} back={`/team/${team.id}`} right={<LinkButton variant="ghost" className="!px-2" to="/rules#prematch">📖</LinkButton>}>
       <Card className="space-y-3">
         <div className="text-sm font-bold">Opponent</div>
+        <OpponentPicker withCtv opponent={m.opponent} onChange={(opponent) => up({ opponent })} />
         <Field label="Team name">
           <input className={inputCls} value={m.opponent.name} onChange={(e) => up({ opponent: { ...m.opponent, name: e.target.value } })} placeholder="e.g. Reikland Reserves" />
         </Field>

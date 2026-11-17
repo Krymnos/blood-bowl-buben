@@ -11,6 +11,7 @@ import { fmtDate, gp } from '../logic/format'
 import { resultOf } from '../logic/stats'
 import { Badge, Button, Card, Field, H2, inputCls, LinkButton, NumberInput, Page, Sheet, Stepper } from '../components/ui'
 import { describe } from './LiveMatch'
+import OpponentPicker from '../components/OpponentPicker'
 
 export default function MatchReport({ match: m }: { match: Match }) {
   const nav = useNavigate()
@@ -191,6 +192,7 @@ function EditMatchSheet({ m, players, onClose }: { m: Match; players: Player[]; 
         <Field label="Date">
           <input type="date" className={inputCls} value={new Date(x.date).toISOString().slice(0, 10)} onChange={(e) => e.target.value && set({ date: new Date(e.target.value).getTime() })} />
         </Field>
+        <OpponentPicker opponent={x.opponent} onChange={(opponent) => set({ opponent })} />
         <div className="grid grid-cols-2 gap-2">
           <Field label="Opponent team">
             <input className={inputCls} value={x.opponent.name} onChange={(e) => opp({ name: e.target.value })} />

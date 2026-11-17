@@ -1,0 +1,69 @@
+rules_version = '2';
+
+// Blood Bowl Buben league sync. See docs/LEAGUE-SYNC-FIREBASE.md.
+// Members read everything; each coach writes only under coaches/{their uid}.
+// Signed-in strangers may only create their own join request. Everyone else gets nothing.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The league admin's Firebase Auth uid. Keep in sync with app/src/league.config.ts.
+    // Empty = nobody is admin (safe default until the admin has signed in once).
+    function adminUid() { return ''; } // ADMIN_UID
+
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && adminUid() != '' && request.auth.uid == adminUid(); }
+    function isMember() {
+      return signedIn() && (isAdmin() || exists(/databases/$(database)/documents/members/$(request.auth.uid)));
+    }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function validCoach(name) { return name is string && name.size() > 0 && name.size() <= 40; }
+    function localId(id) { return id.matches('^[0-9]{1,15}$'); }
+
+    // Who is in the league. Only the admin adds or removes members.
+    match /members/{uid} {
+      allow get: if isSelf(uid) || isMember();
+      allow list: if isMember();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['coach', 'joinedAt'])
+        && validCoach(request.resource.data.coach);
+      allow delete: if isAdmin();
+    }
+
+    // Join requests: a signed-in user writes (or withdraws) only their own; the admin reviews them.
+    match /requests/{uid} {
+      allow get: if isSelf(uid) || isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if isSelf(uid)
+        && request.resource.data.keys().hasOnly(['coach', 'requestedAt'])
+        && validCoach(request.resource.data.coach)
+        && request.resource.data.requestedAt == request.time;
+      allow delete: if isSelf(uid) || isAdmin();
+    }
+
+    // Each coach's published data. Owner writes (while a member), members read, admin may clean up.
+    match /coaches/{uid} {
+      allow read: if isMember();
+      allow create, update: if isSelf(uid) && isMember()
+        && request.resource.data.keys().hasOnly(['coach', 'device', 'updatedAt'])
+        && validCoach(request.resource.data.coach);
+      allow delete: if (isSelf(uid) && isMember()) || isAdmin();
+
+      match /{kind}/{docId} {
+        allow read: if isMember();
+        allow create, update: if isSelf(uid) && isMember()
+          && kind in ['teams', 'matches']
+          && localId(docId)
+          && request.resource.data.keys().hasOnly(['team', 'players', 'match', 'events', 'hash', 'updatedAt']);
+        allow delete: if (isSelf(uid) && isMember()) || isAdmin();
+      }
+    }
+
+    // League view: collection-group queries across all coaches.
+    match /{path=**}/teams/{teamId} {
+      allow read: if isMember();
+    }
+    match /{path=**}/matches/{matchId} {
+      allow read: if isMember();
+    }
+  }
+}

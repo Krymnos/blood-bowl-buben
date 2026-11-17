@@ -58,6 +58,11 @@ export function setConfig(c: CloudConfig | undefined) {
   setStatus({ sha: undefined, hash: undefined, lastAt: undefined, error: undefined, conflict: false })
 }
 export const useCloudConfig = () => useSyncExternalStore(subscribe, () => config)
+export const hasCloud = () => !!config
+
+const backupHooks = new Set<() => void>()
+/** Called after every successful backup (used for the admin's league backup). */
+export const onBackup = (fn: () => void) => void backupHooks.add(fn)
 export const useCloudStatus = () => useSyncExternalStore(subscribe, () => status)
 
 // ---------- GitHub API ----------
@@ -106,7 +111,7 @@ export async function testConnection(c: CloudConfig) {
 // ---------- backup / restore ----------
 
 /** Small stable hash (FNV-1a) so unchanged data isn't committed again. crypto.subtle needs HTTPS, this doesn't. */
-function hashOf(s: string) {
+export function hashOf(s: string) {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193)
   return (h >>> 0).toString(16) + ':' + s.length
@@ -152,6 +157,7 @@ export function backupNow(force = false): Promise<'saved' | 'unchanged'> {
       const snap = await snapshot()
       if (!force && snap.hash === status.hash && !status.conflict) {
         setStatus({ dirty: false, error: undefined })
+        backupHooks.forEach((h) => h())
         return 'unchanged' as const
       }
       const remote = await remoteFile(c)
@@ -170,11 +176,26 @@ export function backupNow(force = false): Promise<'saved' | 'unchanged'> {
       })
       const sha = (await res.json()).content.sha as string
       setStatus({ sha, hash: snap.hash, lastAt: Date.now(), dirty: false, error: undefined, conflict: false })
+      backupHooks.forEach((h) => h())
       return 'saved' as const
     } catch (e) {
       if ((e as Error).message !== 'conflict') setStatus({ error: (e as Error).message === 'Failed to fetch' ? 'Offline: will retry' : (e as Error).message })
       throw e
     }
+  })
+}
+
+/** Write another file into the backup repository (overwrites it; GitHub keeps the history). */
+export function putFile(path: string, text: string, message: string) {
+  return exclusive(async () => {
+    const c = config
+    if (!c) throw new Error('Cloud backup is not set up')
+    const target = { ...c, path }
+    const remote = await remoteFile(target)
+    await gh(target, filePath(target), {
+      method: 'PUT',
+      body: JSON.stringify({ message, content: toBase64(text), ...(remote ? { sha: remote.sha } : {}) }),
+    })
   })
 }
 
