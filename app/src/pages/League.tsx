@@ -12,7 +12,7 @@ import { fmtTarget, playerValue, profile, statDelta, teamValue } from '../logic/
 import { computeStats, teamRecord } from '../logic/stats'
 import { fmtDate, gp } from '../logic/format'
 import { fmtMonth, monthDate, parseLeagueSheet, type SheetParse } from '../logic/sheetImport'
-import { LeagueJoin } from '../components/LeagueAccount'
+import LeagueSettings, { LeagueJoin } from '../components/LeagueAccount'
 import { Badge, Button, Card, Empty, Field, H2, inputCls, NumberInput, Page, Sheet, useSettings } from '../components/ui'
 import { PlayerRow } from './TeamPage'
 import { BOARDS } from './Stats'
@@ -39,11 +39,16 @@ export default function League() {
   const games = useMemo(() => (data ? leagueGames(data) : []), [data])
   const tabs: Tab[] = ['table', 'results', 'teams', 'leaders', ...(L.isAdmin ? (['admin'] as Tab[]) : [])]
   const pending = L.requests?.length ?? 0
+  // keep the sync card up after a conflict is resolved, so its result message stays visible
+  const [hadConflict, setHadConflict] = useState(false)
+  if (L.sync.conflict && !hadConflict) setHadConflict(true)
 
   return (
     <Page title="League" sub={data ? `Blood Bowl Buben · ${data.members.length} coaches · ${data.teams.length} teams${data.fromCache ? ' · offline copy' : ''}` : 'Blood Bowl Buben'}>
       {gate ?? (
         <>
+          {/* sync paused (new phone, second device): restore or publish right here, not only in Settings */}
+          {(L.sync.conflict || hadConflict) && <LeagueSettings />}
           <div className="flex gap-1 rounded-xl bg-white/5 p-1">
             {tabs.map((t) => (
               <button key={t} onClick={() => pick(t)} className={`flex-1 rounded-lg py-2 text-xs font-semibold capitalize ${tab === t ? 'bg-white/15' : 'text-white/50'}`}>

@@ -296,18 +296,20 @@ async function doSync(force: boolean): Promise<'saved' | 'unchanged' | 'skipped'
     const api = await fb()
     const local = await localDocs()
     let known = new Map(Object.entries(load<Record<string, string>>(K.hashes) ?? {}))
+    const noTeams = local.every((d) => !d.key.startsWith('teams/'))
+    const hasTeams = (m: Map<string, string>) => [...m.keys()].some((k) => k.startsWith('teams/'))
     if (!reconciled || force) {
       // first sync this session: compare against what is really in Firestore (also refills a wiped project)
       const remote = await api.fetchOwn(user.uid)
       if (!force && remote.device && remote.device !== deviceId) {
-        setSync({ conflict: 'device', error: undefined })
+        // a new, empty phone: 'empty' (offers restoring), not 'device'
+        setSync({ conflict: noTeams && hasTeams(remote.hashes) ? 'empty' : 'device', error: undefined })
         return 'skipped'
       }
       known = remote.hashes
     }
     const localKeys = new Set(local.map((d) => d.key))
-    const knownTeams = [...known.keys()].filter((k) => k.startsWith('teams/')).length
-    if (!force && local.every((d) => !d.key.startsWith('teams/')) && knownTeams > 0) {
+    if (!force && noTeams && hasTeams(known)) {
       // safety net: an emptied phone must not silently wipe the coach's league data
       setSync({ conflict: 'empty', error: undefined })
       return 'skipped'
@@ -330,6 +332,45 @@ async function doSync(force: boolean): Promise<'saved' | 'unchanged' | 'skipped'
   } finally {
     setSync({ busy: false })
   }
+}
+
+// ---------- restoring own data from the league ----------
+
+/**
+ * New or wiped phone: replace this phone's teams, players and finished games with what this coach published
+ * (same ids). Unfinished games on this phone are lost; photos stay only where their game came back.
+ * Settings are kept. Then this phone becomes the one that publishes.
+ */
+export async function restoreFromLeague(): Promise<{ teams: number; matches: number }> {
+  const user = state.user
+  if (!user || state.membership !== 'member') throw new Error('Not a league member')
+  if (!navigator.onLine) throw new Error('Offline: connect to restore')
+  while (running) await running.catch(() => {})
+  const api = await fb()
+  const remote = await withTimeout(api.fetchOwn(user.uid), 45_000)
+  const teams = remote.teams.map((d) => d.team as Team).filter((t) => t && typeof t.id === 'number')
+  if (!teams.length) throw new Error('The league has no teams of yours to restore')
+  const teamIds = new Set(teams.map((t) => t.id))
+  const players = remote.teams.flatMap((d) => (d.players ?? []) as Player[]).filter((p) => teamIds.has(p.teamId))
+  const docs = remote.matches.filter((d) => d.match && teamIds.has((d.match as Match).teamId))
+  const matches = docs.map((d) => d.match as Match)
+  const events = docs.flatMap((d) => (d.events ?? []) as MatchEvent[])
+  await db.transaction('rw', [db.teams, db.players, db.matches, db.events, db.photos], async () => {
+    // keep a photo only if its game comes back (same id and date, i.e. really the same game)
+    const date = new Map(matches.map((m) => [m.id, m.date]))
+    const before = new Map((await db.matches.toArray()).map((m) => [m.id, m.date]))
+    const stale = (await db.photos.toArray()).filter((p) => date.get(p.matchId) == null || date.get(p.matchId) !== before.get(p.matchId))
+    await db.photos.bulkDelete(stale.map((p) => p.id))
+    await Promise.all([db.teams.clear(), db.players.clear(), db.matches.clear(), db.events.clear()])
+    await db.teams.bulkAdd(teams)
+    await db.players.bulkAdd(players)
+    await db.matches.bulkAdd(matches)
+    await db.events.bulkAdd(events)
+  })
+  clearTimeout(timer)
+  // claim the league data for this phone (rewrites only docs whose hash differs after the round trip)
+  await syncNow(true)
+  return { teams: teams.length, matches: matches.length }
 }
 
 const withTimeout = <T,>(p: Promise<T>, ms: number) =>

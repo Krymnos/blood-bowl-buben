@@ -70,16 +70,30 @@ async function waitText(page, t, ms = 15000) {
   }
   return false
 }
-async function setup(page, email) {
+async function setup(page, email, { demo = true, hash = '#/league' } = {}) {
   await page.goto(base, { waitUntil: 'networkidle0' })
-  await click(page, 'Load demo')
-  await sleep(800)
+  if (demo) {
+    await click(page, 'Load demo')
+    await sleep(800)
+  }
   await page.evaluate(() => localStorage.setItem('sd-league-on', 'true'))
-  await page.goto(base + '#/league', { waitUntil: 'networkidle0' })
+  await page.goto(base + hash, { waitUntil: 'networkidle0' })
   await page.reload({ waitUntil: 'networkidle0' })
   await page.waitForFunction(() => window.__emuSignIn, { timeout: 15000 })
   await page.evaluate((e) => window.__emuSignIn(e, 'secret123'), email)
 }
+/** this phone's teams and matches, straight from IndexedDB */
+const local = (page) =>
+  page.evaluate(() => new Promise((res) => {
+    const r = indexedDB.open('sevens-dugout')
+    r.onsuccess = () => {
+      const tx = r.result.transaction(['teams', 'matches'])
+      const o = {}
+      tx.objectStore('teams').getAll().onsuccess = (e) => (o.teams = e.target.result)
+      tx.objectStore('matches').getAll().onsuccess = (e) => (o.matches = e.target.result)
+      tx.oncomplete = () => (r.result.close(), res(o))
+    }
+  }))
 async function typeInto(page, placeholder, value) {
   const el = await page.$(`input[placeholder="${placeholder}"]`)
   await el.evaluate((e) => e.select())
@@ -313,6 +327,37 @@ check(await waitText(A2, 'another device'), 'second device of the same coach get
 await A2.shot('conflict')
 check((await fsList('coaches/admin-uid/teams')).length === 1, 'admin data intact')
 
+// 6b. ... and can load the league data onto that device instead (it then publishes from there)
+const deviceOf = async (uid) => (await fsGet(`coaches/${uid}`)).fields.device.stringValue
+const aDevice = await deviceOf('admin-uid')
+const aDone = (await fsList('coaches/admin-uid/matches')).length
+await click(A2, 'Load my league data')
+check(await waitText(A2, 'Restored 1 team(s)'), 'second device loads the league data')
+const a2 = await local(A2)
+check(a2.teams.length === 1 && a2.teams[0].name === ronTeam && a2.matches.length === aDone, `second device now has the league data (${a2.teams.length} team(s), ${a2.matches.length} match(es))`)
+check((await deviceOf('admin-uid')) !== aDevice && !(await text(A2)).includes('another device'), 'second device took over publishing, conflict gone')
+await A2.shot('restored-device')
+
+// 6c. Lena gets a new (empty) phone: offered a restore, nothing removed from the league
+const lenaMatches = await fsList('coaches/lena-uid/matches')
+const C2 = await phone('lena2')
+await setup(C2, 'lena@example.com', { demo: false })
+check(await waitText(C2, 'no teams'), 'empty new phone: sync paused, restore offered on the League tab')
+check((await fsList('coaches/lena-uid/teams')).length === 1, 'empty phone removed nothing')
+await C2.shot('restore-offer')
+await click(C2, 'Restore from the league')
+check(await waitText(C2, `Restored 1 team(s) and ${lenaMatches.length} finished game(s)`), 'restored from the league')
+const c2 = await local(C2)
+check(
+  c2.teams.length === 1 && c2.teams[0].name === 'Grünhaut Gang' && c2.matches.map((m) => String(m.id)).sort().join() === lenaMatches.sort().join(),
+  'new phone has her team and games, same ids',
+)
+await C2.evaluate(() => (location.hash = '#/'))
+check(await waitText(C2, 'Grünhaut Gang'), 'restored team shows on the home screen')
+await C2.evaluate(() => (location.hash = '#/settings'))
+check(await waitText(C2, 'Published') && (await fsList('coaches/lena-uid/teams')).length === 1, 'new phone publishes, league data unchanged')
+await C2.shot('restored')
+
 // 7. admin removes the coach (and their data)
 await A.evaluate(() => (location.hash = '#/league'))
 await click(A, 'admin')
@@ -327,7 +372,7 @@ check((await fsList('coaches/max-uid/teams')).length === 0 && (await fsList('coa
 await B.evaluate(() => (location.hash = '#/league'))
 check(await waitText(B, 'Ask to join', 15000), 'removed coach loses access (live)')
 
-for (const [n, p] of [['admin', A], ['max', B], ['lena', C], ['admin2', A2]]) {
+for (const [n, p] of [['admin', A], ['max', B], ['lena', C], ['admin2', A2], ['lena2', C2]]) {
   const errs = p.errors.filter((e) => !/Failed to load resource|permission|Missing or insufficient/i.test(e))
   check(errs.length === 0, `${n}: no unexpected console errors ${errs.length ? JSON.stringify(errs).slice(0, 400) : ''}`)
 }

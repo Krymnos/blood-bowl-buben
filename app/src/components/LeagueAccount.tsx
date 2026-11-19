@@ -3,14 +3,14 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { ADMIN_UID } from '../league.config'
 import { ago } from '../logic/cloud'
-import { downloadLeagueBackup, getLeague, requestJoin, signIn, signOut, startData, syncNow, useLeague, withdrawRequest } from '../logic/league'
+import { downloadLeagueBackup, getLeague, requestJoin, restoreFromLeague, signIn, signOut, startData, syncNow, useLeague, withdrawRequest } from '../logic/league'
 import { Button, Card, inputCls } from './ui'
 
 export function LeagueSyncLine() {
   const { sync: s, membership } = useLeague()
   if (membership !== 'member') return null
   if (s.busy) return <span className="text-white/50">🏟️ Publishing to the league…</span>
-  if (s.conflict) return <span className="text-red-300">⚠️ League sync paused: open Settings</span>
+  if (s.conflict) return <span className="text-red-300">⚠️ League sync paused: see the League tab</span>
   if (s.error) return <span className="text-amber-300">⚠️ League: {s.error}</span>
   return (
     <span className="text-white/50">
@@ -158,26 +158,48 @@ export default function LeagueSettings() {
           Sign out
         </button>
       </div>
-      <div className="text-xs">
-        <LeagueSyncLine />
-      </div>
+      {!s.conflict && (
+        <div className="text-xs">
+          <LeagueSyncLine />
+        </div>
+      )}
       {s.conflict === 'device' && (
         <div className="rounded-xl border border-red-400/40 bg-red-500/10 p-2 text-xs leading-relaxed">
-          Your league data was last published from <b>another device</b>. League sync is one phone per coach: publishing from this phone replaces what the other one published.
+          Your league data was last published from <b>another device</b>. League sync is one phone per coach. Either load your league data onto this phone (replaces the teams and
+          games here), or publish from this phone (replaces what the other one published).
         </div>
       )}
       {s.conflict === 'empty' && (
         <div className="rounded-xl border border-red-400/40 bg-red-500/10 p-2 text-xs leading-relaxed">
-          This phone has <b>no teams</b>, but the league still has your published teams. Restore your backup first, or publish anyway to remove your teams from the league.
+          This phone has <b>no teams</b>, but the league still has your published teams. New phone? Restore them from the league. Don't create a team here first.
         </div>
       )}
+      {s.conflict && (
+        <Button
+          className="w-full"
+          disabled={busy || s.busy}
+          onClick={() =>
+            run(async () => {
+              if (
+                s.conflict === 'device' &&
+                !confirm('Replace the teams and games on THIS phone with your league data? Unfinished games on this phone are lost. Export a backup first if you want to keep them.')
+              )
+                return
+              const r = await restoreFromLeague()
+              setMsg(`✅ Restored ${r.teams} team(s) and ${r.matches} finished game(s). Photos and unfinished games aren't in the league.`)
+            })
+          }
+        >
+          {s.conflict === 'empty' ? '⬇️ Restore from the league' : '⬇️ Load my league data onto this phone'}
+        </Button>
+      )}
       <Button
-        variant="soft"
+        variant={s.conflict ? 'ghost' : 'soft'}
         className="w-full"
         disabled={busy || s.busy}
         onClick={() =>
           run(async () => {
-            if (s.conflict && !confirm('Publish the data on THIS phone and replace your league data?')) return
+            if (s.conflict && !confirm(s.conflict === 'empty' ? 'This phone has no teams: publishing REMOVES your teams and games from the league. Continue?' : 'Publish the data on THIS phone and replace your league data?')) return
             const r = await syncNow(!!s.conflict)
             setMsg(r === 'unchanged' ? '✅ Nothing changed.' : r === 'saved' ? '✅ Published.' : undefined)
           })

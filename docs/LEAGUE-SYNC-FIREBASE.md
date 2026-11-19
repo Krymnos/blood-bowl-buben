@@ -1,6 +1,6 @@
 # League sync (Firebase)
 
-> **Status (2026-11-17): built (steps 1–6), not live yet.** Waiting on: rules deployed, admin user id filled in, two-phone test (see *Next steps*).
+> **Status (2026-11-19): live, rollout started.** Rules deployed, admin set up, the first two coaches joined (approved by the admin) and their teams synced. A coach on a new phone restores from the league (*Restore from the league*, 2026-11-19).
 
 ## Goal
 Every coach in the Blood Bowl Buben league keeps tracking their own team(s) in the app, and everyone can see the whole league in one place:
@@ -73,8 +73,9 @@ coaches/{uid}/matches/{matchId}  { match, events[], hash, updatedAt }     owner 
 - **Deletes are synced too:** a team or match deleted locally is deleted in Firestore.
 - **First sync of each session compares with Firestore itself** (by `hash`), so a wiped project or a missed delete is repaired automatically.
 - **Only finished games are published.** Pre-game, live and post-game matches stay on the phone.
-- **One device per coach for now.** If a coach's data was last published from another phone, sync pauses and Settings asks "Publish from this phone" (replaces the other phone's data). A coach who switches phones restores the backup first. Real multi-device merging is a later step if anyone needs it.
-- **Safety net:** a phone with no teams never silently wipes the coach's league data; sync pauses and asks first.
+- **One device per coach for now.** If a coach's data was last published from another phone, sync pauses and the League tab (and Settings) offer two ways out: *Load my league data onto this phone* (replaces this phone's teams and games) or *Publish from this phone* (replaces the other phone's league data). Real multi-device merging is a later step if anyone needs it.
+- **Safety net:** a phone with no teams never silently wipes the coach's league data; sync pauses and offers *Restore from the league* instead.
+- **Restore from the league (new or wiped phone).** Pulls the coach's own teams, players and finished games (with their events) back into the phone with the same ids, then publishes from this phone. Not in the league, so not restored: photos, unfinished games, house-rule settings. Photos already on the phone stay only if their game comes back. A full move (photos included) is still *Export backup* on the old phone → *Import backup* on the new one.
 
 ### Pairing games
 - In pre-game, "Opponent" gets a **pick from the league** option: the participant list (in the app or not) plus teams in the app that aren't on it. It fills in name, coach, roster (and CTV for teams in the app), and stores `opponent.pid` (participant) and/or `opponent.ref = { uid, teamId }` (team in the app) on the match.
@@ -125,8 +126,12 @@ coaches/{uid}/matches/{matchId}  { match, events[], hash, updatedAt }     owner 
 - [x] Admin id filled in (2026-11-17)
 - [x] Participant list: games against listed coaches count even before they're in the app; they pick their entry when joining (2026-11-17)
 - [x] League records: import of the old league sheet, admin-entered results, "Log a past game" for coaches who join later (2026-11-17)
-- [ ] Rules deployed (you)
-- [ ] Two-phone test, then roll out
+- [x] Rules deployed, admin joined (2026-11-19)
+- [x] First two coaches joined and approved; their teams synced (2026-11-19)
+- [ ] Rollout to the rest of the league
+- [ ] Check Google sign-in from the iPhone home-screen app (if not done yet)
+- [x] **Switching phones (first case 2026-11-19).** New phone: install the app, sign in, *don't create a team*; the League tab offers *Restore from the league*. If the old phone still works, *Export backup* there and *Import backup* on the new one keeps photos and unfinished games too (then *Publish from this phone*).
+- [ ] Later, if wanted: several devices per coach (phone + laptop) with two-way sync. Needs ids that can't collide between devices and newest-edit-wins per team/match.
 
 ## Next steps
 1. **Lock the database now (2 minutes).** (Deploy again after every rules change: the participant list added one.) If Firestore was created in *test mode*, it's open to anyone until the rules are deployed. The rules in the repo are safe even before the admin id is filled in (nobody can read or write league data). Either:

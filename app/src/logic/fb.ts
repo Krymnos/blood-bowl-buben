@@ -215,6 +215,8 @@ export function watchLeague(cb: (d: RawLeague) => void, onError: (e: Error) => v
 export interface OwnRemote {
   device?: string
   hashes: Map<string, string> // 'teams/1' → hash
+  teams: DocumentData[]
+  matches: DocumentData[]
 }
 export async function fetchOwn(uid: string): Promise<OwnRemote> {
   const [c, t, m] = await Promise.all([
@@ -225,7 +227,7 @@ export async function fetchOwn(uid: string): Promise<OwnRemote> {
   const hashes = new Map<string, string>()
   for (const d of t.docs) hashes.set(`teams/${d.id}`, d.data().hash)
   for (const d of m.docs) hashes.set(`matches/${d.id}`, d.data().hash)
-  return { device: c.data()?.device, hashes }
+  return { device: c.data()?.device, hashes, teams: t.docs.map((d) => d.data()), matches: m.docs.map((d) => d.data()) }
 }
 
 export type Op = { key: string; data?: DocumentData } // no data = delete
